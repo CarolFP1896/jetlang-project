@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JetLang — O seu passaporte para o mundo</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f8f9fc;
+    --sidebar-bg: #0f1b2d;
+    --sidebar-hover: #1a2d47;
+    --sidebar-active: #1e3a5f;
+    --primary: #2563eb;
+    --primary2: #0ea5e9;
+    --accent: #f97316;
+    --green: #10b981;
+    --red: #ef4444;
+    --grad: linear-gradient(135deg, #2563eb, #0ea5e9, #10b981);
+    --grad-orange: linear-gradient(135deg, #f97316, #f59e0b);
+    --text: #1e293b;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --card: #ffffff;
+    --radius: 14px;
+    --radius-sm: 8px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.07);
+    --shadow-md: 0 4px 24px rgba(0,0,0,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Nunito', sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; }
+
+  /* ── LOGIN ── */
+  #login-screen {
+    display: flex; align-items: center; justify-content: center;
+    width: 100%; height: 100vh;
+    background: linear-gradient(135deg, #0f1b2d 0%, #1e3a5f 50%, #0ea5e9 100%);
+  }
+  .login-card {
+    background: white; border-radius: 24px; padding: 48px 40px;
+    text-align: center; width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  }
+  .login-logo { font-size: 2.4rem; font-weight: 900; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 6px; }
+  .login-slogan { color: var(--text-muted); font-size: 0.95rem; margin-bottom: 36px; }
+  .login-mascot { font-size: 4rem; margin-bottom: 20px; }
+  .login-headline { font-size: 1.3rem; font-weight: 800; color: var(--text); margin-bottom: 8px; }
+  .login-sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 32px; line-height: 1.5; }
+  .btn-google {
+    width: 100%; padding: 14px; border-radius: var(--radius); border: 2px solid var(--border);
+    background: white; cursor: pointer; font-family: 'Nunito', sans-serif;
+    font-size: 1rem; font-weight: 700; color: var(--text);
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    transition: all 0.2s; margin-bottom: 12px;
+  }
+  .btn-google:hover { border-color: var(--primary); background: #f0f7ff; }
+  .btn-email-login {
+    width: 100%; padding: 14px; border-radius: var(--radius); border: none;
+    background: var(--grad); cursor: pointer; font-family: 'Nunito', sans-serif;
+    font-size: 1rem; font-weight: 700; color: white;
+    transition: all 0.2s; margin-bottom: 20px;
+  }
+  .btn-email-login:hover { opacity: 0.9; transform: translateY(-1px); }
+  .login-divider { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px; }
+  .login-input {
+    width: 100%; padding: 12px 16px; border-radius: var(--radius-sm);
+    border: 2px solid var(--border); font-family: 'Nunito', sans-serif;
+    font-size: 0.95rem; margin-bottom: 10px; outline: none; transition: border 0.2s;
+  }
+  .login-input:focus { border-color: var(--primary); }
+  .login-error { color: var(--red); font-size: 0.85rem; margin-top: 8px; min-height: 20px; }
+  .login-toggle { color: var(--primary); cursor: pointer; font-size: 0.88rem; font-weight: 600; }
+
+  /* ── APP SHELL ── */
+  #app { display: none; width: 100%; height: 100vh; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 260px; min-width: 260px; background: var(--sidebar-bg);
+    display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
+    padding: 24px 0;
+  }
+  .sidebar-logo { padding: 0 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .logo-text { font-size: 1.8rem; font-weight: 900; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .logo-slogan { color: rgba(255,255,255,0.4); font-size: 0.78rem; margin-top: 2px; }
+
+  .sidebar-user { padding: 16px 20px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+  .user-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--grad); display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; overflow: hidden; }
+  .user-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .user-name { color: white; font-size: 0.88rem; font-weight: 700; }
+  .user-xp { color: rgba(255,255,255,0.45); font-size: 0.75rem; }
+
+  .sidebar-section { padding: 16px 20px 8px; color: rgba(255,255,255,0.3); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .nav-item {
+    padding: 10px 20px; display: flex; align-items: center; gap: 10px;
+    color: rgba(255,255,255,0.6); font-size: 0.9rem; font-weight: 600;
+    cursor: pointer; border-radius: 0; transition: all 0.15s; margin: 1px 8px;
+    border-radius: var(--radius-sm);
+  }
+  .nav-item:hover { background: var(--sidebar-hover); color: white; }
+  .nav-item.active { background: var(--sidebar-active); color: white; }
+  .nav-item .flag { font-size: 1.1rem; }
+  .nav-tag { margin-left: auto; font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+  .tag-studying { background: rgba(14,165,233,0.2); color: #38bdf8; }
+  .tag-done { background: rgba(16,185,129,0.2); color: #34d399; }
+  .tag-todo { background: rgba(249,115,22,0.2); color: #fb923c; }
+
+  .sidebar-add-lang {
+    margin: 8px 8px 0; padding: 10px 20px; border-radius: var(--radius-sm);
+    border: 1px dashed rgba(255,255,255,0.2); color: rgba(255,255,255,0.4);
+    font-size: 0.85rem; cursor: pointer; text-align: center; transition: all 0.2s;
+  }
+  .sidebar-add-lang:hover { border-color: var(--primary2); color: var(--primary2); }
+
+  .sidebar-footer { margin-top: auto; padding: 16px 20px; }
+  .btn-logout { width: 100%; padding: 10px; border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,0.1); background: transparent; color: rgba(255,255,255,0.4); font-family: 'Nunito', sans-serif; font-size: 0.85rem; cursor: pointer; transition: all 0.2s; }
+  .btn-logout:hover { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #f87171; }
+
+  /* ── MAIN ── */
+  .main { flex: 1; overflow-y: auto; padding: 32px; }
+  .screen { display: none; }
+  .screen.active { display: block; }
+
+  /* ── PAINEL GERAL ── */
+  .topbar { display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; }
+  .page-title { font-size: 1.6rem; font-weight: 900; }
+  .page-sub { color: var(--text-muted); font-size: 0.9rem; margin-top: 2px; }
+
+  .boarding-pass {
+    background: linear-gradient(135deg, #0f1b2d, #1e3a5f);
+    border-radius: 20px; padding: 28px 32px; margin-bottom: 28px;
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    position: relative; overflow: hidden;
+  }
+  .boarding-pass::before { content:''; position:absolute; right:-40px; top:-40px; width:200px; height:200px; border-radius:50%; background:rgba(14,165,233,0.08); }
+  .bp-airline { color: rgba(255,255,255,0.5); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 6px; }
+  .bp-name { color: white; font-size: 1.5rem; font-weight: 900; }
+  .bp-route { display: flex; align-items: center; gap: 12px; margin-top: 12px; }
+  .bp-city { color: rgba(255,255,255,0.6); font-size: 0.8rem; }
+  .bp-code { color: white; font-size: 1.4rem; font-weight: 900; }
+  .bp-arrow { color: var(--primary2); font-size: 1.2rem; }
+  .bp-right { text-align: right; }
+  .bp-label { color: rgba(255,255,255,0.4); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+  .bp-value { color: white; font-weight: 800; font-size: 1rem; margin-top: 2px; }
+  .bp-xp { margin-top: 14px; }
+  .bp-xp-bar { height: 6px; border-radius: 3px; background: rgba(255,255,255,0.1); margin-top: 6px; }
+  .bp-xp-fill { height: 100%; border-radius: 3px; background: var(--grad); transition: width 0.6s; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .stat-icon { font-size: 1.5rem; margin-bottom: 8px; }
+  .stat-value { font-size: 1.6rem; font-weight: 900; }
+  .stat-label { color: var(--text-muted); font-size: 0.8rem; font-weight: 600; margin-top: 2px; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 28px; }
+  .card { background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); }
+  .card-title { font-size: 1rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+
+  .lang-progress-item { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+  .lang-flag { font-size: 1.3rem; }
+  .lang-info { flex: 1; }
+  .lang-name { font-size: 0.88rem; font-weight: 700; }
+  .lang-pct { font-size: 0.75rem; color: var(--text-muted); }
+  .prog-bar { height: 6px; border-radius: 3px; background: var(--border); margin-top: 4px; }
+  .prog-fill { height: 100%; border-radius: 3px; background: var(--grad); transition: width 0.6s; }
+
+  .ranking-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .ranking-item:last-child { border-bottom: none; }
+  .rank-num { font-size: 0.85rem; font-weight: 900; color: var(--text-muted); width: 20px; }
+  .rank-name { flex: 1; font-size: 0.9rem; font-weight: 600; }
+  .rank-count { font-size: 0.8rem; color: var(--text-muted); }
+
+  .conquistas-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .conquista-item { text-align: center; padding: 16px 8px; border-radius: var(--radius-sm); border: 2px solid var(--border); }
+  .conquista-item.unlocked { border-color: var(--green); background: rgba(16,185,129,0.05); }
+  .conquista-item.locked { opacity: 0.4; }
+  .conquista-emoji { font-size: 1.8rem; margin-bottom: 6px; }
+  .conquista-name { font-size: 0.75rem; font-weight: 700; }
+
+  /* ── TELA IDIOMA ── */
+  .lang-header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .lang-header-flag { font-size: 2.5rem; }
+  .lang-header-title { font-size: 1.8rem; font-weight: 900; }
+  .lang-header-prog { flex: 1; max-width: 300px; }
+  .lang-header-pct { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+
+  .lang-tabs { display: flex; gap: 4px; margin-bottom: 24px; background: var(--border); border-radius: var(--radius-sm); padding: 4px; width: fit-content; }
+  .lang-tab { padding: 8px 20px; border-radius: 6px; font-size: 0.9rem; font-weight: 700; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
+  .lang-tab.active { background: white; color: var(--text); box-shadow: var(--shadow); }
+
+  .connections-grid { display: grid; grid-template-columns: 1fr 1fr 2fr; gap: 16px; margin-bottom: 24px; }
+  .conn-card { background: var(--card); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+  .conn-label { font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px; }
+  .conn-input { width: 100%; border: none; background: transparent; font-family: 'Nunito', sans-serif; font-size: 0.9rem; color: var(--text); resize: none; outline: none; }
+
+  /* ── TABELA DE TERMOS ── */
+  .terms-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .btn-add { padding: 10px 20px; border-radius: var(--radius-sm); border: none; background: var(--grad); color: white; font-family: 'Nunito', sans-serif; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .btn-add:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .term-card { background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 10px; overflow: hidden; }
+  .term-header { padding: 14px 18px; display: flex; align-items: center; gap: 12px; cursor: pointer; }
+  .term-word { font-size: 1rem; font-weight: 800; flex: 1; }
+  .term-preview { font-size: 0.82rem; color: var(--text-muted); }
+  .term-chevron { color: var(--text-muted); font-size: 0.8rem; transition: transform 0.2s; }
+  .term-card.open .term-chevron { transform: rotate(180deg); }
+  .term-body { display: none; padding: 0 18px 18px; border-top: 1px solid var(--border); }
+  .term-card.open .term-body { display: block; }
+  .term-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .term-field label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); display: block; margin-bottom: 4px; }
+  .term-field p { font-size: 0.88rem; color: var(--text); }
+  .term-frases { margin-top: 12px; }
+  .term-frase { font-size: 0.85rem; color: var(--text-muted); padding: 6px 12px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; border-left: 3px solid var(--primary2); }
+
+  /* ── PRÁTICA ── */
+  .pratica-config { background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; }
+  .pratica-config-title { font-size: 1rem; font-weight: 800; margin-bottom: 16px; }
+  .config-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .config-chip { padding: 8px 16px; border-radius: 20px; border: 2px solid var(--border); font-size: 0.85rem; font-weight: 700; cursor: pointer; color: var(--text-muted); transition: all 0.15s; }
+  .config-chip.selected { border-color: var(--primary); background: rgba(37,99,235,0.08); color: var(--primary); }
+  .btn-gerar { padding: 12px 28px; border-radius: var(--radius-sm); border: none; background: var(--grad); color: white; font-family: 'Nunito', sans-serif; font-size: 0.95rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .btn-gerar:hover { opacity: 0.9; transform: translateY(-1px); }
+  .btn-gerar:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .pratica-texto { background: var(--card); border-radius: var(--radius); padding: 24px; box-shadow: var(--shadow); margin-bottom: 20px; line-height: 1.9; font-size: 0.95rem; }
+  .pratica-texto .termo-highlight { background: rgba(16,185,129,0.15); color: #059669; border-radius: 4px; padding: 1px 5px; font-weight: 700; text-decoration: underline; text-decoration-color: rgba(16,185,129,0.4); }
+
+  .exercicios-list { display: flex; flex-direction: column; gap: 14px; }
+  .exercicio-card { background: var(--card); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); }
+  .ex-tipo { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 8px; }
+  .ex-enunciado { font-size: 0.95rem; font-weight: 700; margin-bottom: 12px; }
+  .ex-input { width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); font-family: 'Nunito', sans-serif; font-size: 0.9rem; outline: none; transition: border 0.2s; }
+  .ex-input:focus { border-color: var(--primary); }
+  .ex-input.correct { border-color: var(--green); background: rgba(16,185,129,0.05); }
+  .ex-input.wrong { border-color: var(--red); background: rgba(239,68,68,0.05); }
+  .ex-feedback { font-size: 0.82rem; margin-top: 6px; font-weight: 600; }
+  .ex-feedback.ok { color: var(--green); }
+  .ex-feedback.err { color: var(--red); }
+  .btn-verificar { margin-top: 16px; padding: 10px 24px; border-radius: var(--radius-sm); border: none; background: var(--text); color: white; font-family: 'Nunito', sans-serif; font-size: 0.88rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+  .btn-verificar:hover { background: var(--primary); }
+
+  /* ── MODAL ── */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; align-items: center; justify-content: center; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: white; border-radius: 20px; padding: 32px; width: 560px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+  .modal-title { font-size: 1.2rem; font-weight: 900; margin-bottom: 20px; }
+  .modal-field { margin-bottom: 14px; }
+  .modal-field label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); display: block; margin-bottom: 6px; }
+  .modal-input { width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); font-family: 'Nunito', sans-serif; font-size: 0.9rem; outline: none; transition: border 0.2s; }
+  .modal-input:focus { border-color: var(--primary); }
+  .modal-textarea { width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 2px solid var(--border); font-family: 'Nunito', sans-serif; font-size: 0.9rem; outline: none; resize: vertical; min-height: 70px; transition: border 0.2s; }
+  .modal-textarea:focus { border-color: var(--primary); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .btn-cancel { padding: 10px 20px; border-radius: var(--radius-sm); border: 2px solid var(--border); background: white; font-family: 'Nunito', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+  .btn-save { padding: 10px 24px; border-radius: var(--radius-sm); border: none; background: var(--grad); color: white; font-family: 'Nunito', sans-serif; font-size: 0.9rem; font-weight: 700; cursor: pointer; }
+
+  /* ── MODAL NOVO IDIOMA ── */
+  .lang-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+  .lang-option { padding: 12px; border-radius: var(--radius-sm); border: 2px solid var(--border); text-align: center; cursor: pointer; font-size: 0.88rem; font-weight: 700; transition: all 0.15s; }
+  .lang-option:hover { border-color: var(--primary); }
+  .lang-option.selected { border-color: var(--primary); background: rgba(37,99,235,0.08); }
+  .lang-option-flag { font-size: 1.5rem; display: block; margin-bottom: 4px; }
+
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: var(--text); color: white; padding: 12px 20px; border-radius: var(--radius-sm); font-size: 0.88rem; font-weight: 700; z-index: 2000; transform: translateY(80px); opacity: 0; transition: all 0.3s; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { background: var(--green); }
+  .toast.error { background: var(--red); }
+
+  .loading { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin 0.6s linear infinite; vertical-align: middle; margin-right: 6px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty-state { text-align: center; padding: 40px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state p { font-size: 0.9rem; }
+</style>
+</head>
+<body>
+
+<!-- ── LOGIN ── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-mascot">🦫🕶️</div>
+    <div class="login-logo">JetLang</div>
+    <div class="login-slogan">O seu passaporte para o mundo.</div>
+    <div class="login-headline">Bem-vinda de volta!</div>
+    <div class="login-sub">Estude sem fronteiras, viva sem limites.</div>
+
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg width="18" height="18" viewBox="0 0 18 18"><path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/><path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/><path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/></svg>
+      Entrar com Google
+    </button>
+
+    <div class="login-divider">— ou use seu e-mail —</div>
+
+    <div id="email-form">
+      <input class="login-input" type="email" id="email-input" placeholder="seu@email.com">
+      <input class="login-input" type="password" id="pass-input" placeholder="Senha">
+      <button class="btn-email-login" onclick="loginEmail()">Entrar</button>
+      <div><span class="login-toggle" onclick="toggleSignup()">Criar conta nova</span></div>
+    </div>
+    <div class="login-error" id="login-error"></div>
+  </div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-text">✈️ JetLang</div>
+      <div class="logo-slogan">O seu passaporte para o mundo.</div>
+    </div>
+
+    <div class="sidebar-user">
+      <div class="user-avatar" id="sidebar-avatar">🦫</div>
+      <div>
+        <div class="user-name" id="sidebar-name">Carregando...</div>
+        <div class="user-xp" id="sidebar-xp">0 XP</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">Navegação</div>
+    <div class="nav-item active" onclick="showScreen('painel')" id="nav-painel">
+      <span>📊</span> Painel Geral
+    </div>
+
+    <div class="sidebar-section">Destinos</div>
+    <div id="sidebar-langs"></div>
+    <div class="sidebar-add-lang" onclick="openAddLang()">+ Adicionar destino</div>
+
+    <div class="sidebar-footer">
+      <button class="btn-logout" onclick="logout()">Sair da aeronave 🚪</button>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- PAINEL GERAL -->
+    <div class="screen active" id="screen-painel">
+      <div class="topbar">
+        <div>
+          <div class="page-title">📊 Painel Geral</div>
+          <div class="page-sub">Estude sem fronteiras, viva sem limites.</div>
+        </div>
+      </div>
+
+      <!-- Boarding Pass -->
+      <div class="boarding-pass">
+        <div>
+          <div class="bp-airline">✈️ JetLang Airways</div>
+          <div class="bp-name" id="bp-name">Passageira</div>
+          <div class="bp-route">
+            <div><div class="bp-city">Origem</div><div class="bp-code">BRL</div></div>
+            <div class="bp-arrow">→</div>
+            <div><div class="bp-city">Destino</div><div class="bp-code" id="bp-dest">???</div></div>
+          </div>
+        </div>
+        <div class="bp-right">
+          <div class="bp-label">Milhas acumuladas</div>
+          <div class="bp-value" id="bp-xp-val">0 XP</div>
+          <div class="bp-xp">
+            <div class="bp-label">Próximo nível</div>
+            <div class="bp-xp-bar"><div class="bp-xp-fill" id="bp-xp-bar" style="width:0%"></div></div>
+          </div>
+          <div style="margin-top:12px">
+            <div class="bp-label">Dias seguidos</div>
+            <div class="bp-value" id="bp-streak">🔥 0 dias</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon">🌍</div><div class="stat-value" id="stat-idiomas">0</div><div class="stat-label">Idiomas ativos</div></div>
+        <div class="stat-card"><div class="stat-icon">📚</div><div class="stat-value" id="stat-termos">0</div><div class="stat-label">Termos aprendidos</div></div>
+        <div class="stat-card"><div class="stat-icon">✅</div><div class="stat-value" id="stat-exercicios">0</div><div class="stat-label">Exercícios feitos</div></div>
+        <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-value" id="stat-conquistas">0</div><div class="stat-label">Conquistas</div></div>
+      </div>
+
+      <div class="two-col">
+        <!-- Progresso por idioma -->
+        <div class="card">
+          <div class="card-title">🗺️ Progresso por destino</div>
+          <div id="painel-lang-progress">
+            <div class="empty-state"><div class="icon">🌍</div><p>Adicione seu primeiro idioma!</p></div>
+          </div>
+        </div>
+
+        <!-- Conquistas -->
+        <div class="card">
+          <div class="card-title">🛃 Carimbos de Conquista</div>
+          <div class="conquistas-grid" id="conquistas-grid">
+            <div class="conquista-item unlocked"><div class="conquista-emoji">✈️</div><div class="conquista-name">Primeiras 50 Milhas</div></div>
+            <div class="conquista-item locked"><div class="conquista-emoji">🔥</div><div class="conquista-name">7 Dias Seguidos</div></div>
+            <div class="conquista-item locked"><div class="conquista-emoji">🎒</div><div class="conquista-name">Mochila Cheia</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TELAS DE IDIOMA (geradas dinamicamente) -->
+    <div id="lang-screens"></div>
+
+  </div>
+</div>
+
+<!-- MODAL NOVO TERMO -->
+<div class="modal-overlay" id="modal-termo">
+  <div class="modal">
+    <div class="modal-title">✏️ Novo Termo</div>
+    <div class="modal-field"><label>Termo / Expressão</label><input class="modal-input" id="mt-termo" placeholder="Ex: Sin embargo"></div>
+    <div class="modal-field"><label>Pronúncia</label><input class="modal-input" id="mt-pronuncia" placeholder="Ex: /sin emˈbaɾɣo/"></div>
+    <div class="modal-field"><label>Significado Contextual</label><input class="modal-input" id="mt-significado" placeholder="Ex: No entanto, porém..."></div>
+    <div class="modal-field"><label>Sinônimos (separados por vírgula)</label><input class="modal-input" id="mt-sinonimos" placeholder="Ex: No obstante, pero..."></div>
+    <div class="modal-field"><label>Tema</label>
+      <select class="modal-input" id="mt-tema">
+        <option value="">Selecione...</option>
+        <option>Viagem</option><option>Restaurante</option><option>Apresentação Pessoal</option>
+        <option>Negócios</option><option>Cotidiano</option><option>Emergências</option><option>Outro</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Frase de Exemplo 1</label><input class="modal-input" id="mt-f1" placeholder="Frase usando o termo..."></div>
+    <div class="modal-field"><label>Frase de Exemplo 2</label><input class="modal-input" id="mt-f2" placeholder="Outra frase..."></div>
+    <div class="modal-field"><label>Frase de Exemplo 3</label><input class="modal-input" id="mt-f3" placeholder="Mais uma frase..."></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-termo')">Cancelar</button>
+      <button class="btn-save" onclick="saveTermo()">Salvar Termo ✈️</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOVO IDIOMA -->
+<div class="modal-overlay" id="modal-lang">
+  <div class="modal">
+    <div class="modal-title">🌍 Escolha seu próximo destino</div>
+    <div class="lang-grid" id="lang-options"></div>
+    <div class="modal-field"><label>Objetivo</label>
+      <select class="modal-input" id="ml-objetivo">
+        <option value="viagem">✈️ Viagem</option>
+        <option value="negocios">💼 Negócios</option>
+        <option value="cultura">🎭 Cultura</option>
+        <option value="academico">📚 Acadêmico</option>
+      </select>
+    </div>
+    <div class="modal-field"><label>Nível atual</label>
+      <select class="modal-input" id="ml-nivel">
+        <option value="iniciante">🐣 Iniciante</option>
+        <option value="basico">📖 Básico</option>
+        <option value="intermediario">🎯 Intermediário</option>
+        <option value="avancado">🚀 Avançado</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal('modal-lang')">Cancelar</button>
+      <button class="btn-save" onclick="addIdioma()">Embarcar! 🛫</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://ndgrdbwoibycdvhyakpl.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kZ3JkYndvaWJ5Y2R2aHlha3BsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyMjk3MTMsImV4cCI6MjA5NzgwNTcxM30.wHj3_sigvCQ6m2fwDhakh9pL9g_UL9y-ZeH47ZtQRec';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+let currentProfile = null;
+let userIdiomas = [];
+let currentLangId = null;
+let currentLangTermos = [];
+let selectedNewLang = null;
+let isSignup = false;
+
+// ── AUTH ──
+async function init() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (session) await enterApp(session.user);
+}
+
+async function loginGoogle() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+  if (error) showError(error.message);
+}
+
+async function loginEmail() {
+  const email = document.getElementById('email-input').value;
+  const pass = document.getElementById('pass-input').value;
+  if (!email || !pass) return showError('Preencha e-mail e senha.');
+  const fn = isSignup ? sb.auth.signUp.bind(sb.auth) : sb.auth.signInWithPassword.bind(sb.auth);
+  const { data, error } = await fn({ email, password: pass });
+  if (error) return showError(error.message);
+  if (data.user) await enterApp(data.user);
+}
+
+function toggleSignup() {
+  isSignup = !isSignup;
+  document.querySelector('.login-toggle').textContent = isSignup ? 'Já tenho conta' : 'Criar conta nova';
+  document.querySelector('.login-headline').textContent = isSignup ? 'Criar sua conta' : 'Bem-vinda de volta!';
+  document.querySelector('.btn-email-login').textContent = isSignup ? 'Criar conta' : 'Entrar';
+}
+
+function showError(msg) { document.getElementById('login-error').textContent = msg; }
+
+async function logout() {
+  await sb.auth.signOut();
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+}
+
+async function enterApp(user) {
+  currentUser = user;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  await loadProfile();
+  await loadIdiomas();
+  renderPainel();
+}
+
+// ── PROFILE ──
+async function loadProfile() {
+  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = data;
+  if (data) {
+    document.getElementById('sidebar-name').textContent = data.nome;
+    document.getElementById('sidebar-xp').textContent = data.xp_total + ' XP';
+    document.getElementById('bp-name').textContent = data.nome;
+    document.getElementById('bp-xp-val').textContent = data.xp_total + ' XP';
+    document.getElementById('bp-streak').textContent = '🔥 ' + data.sequencia_dias + ' dias';
+    const pct = Math.min((data.xp_total % 100), 100);
+    document.getElementById('bp-xp-bar').style.width = pct + '%';
+    if (data.avatar_url) {
+      document.getElementById('sidebar-avatar').innerHTML = `<img src="${data.avatar_url}" alt="avatar">`;
+    }
+  }
+}
+
+// ── IDIOMAS ──
+async function loadIdiomas() {
+  const { data } = await sb.from('usuario_idiomas')
+    .select('*, idiomas(*)').eq('usuario_id', currentUser.id);
+  userIdiomas = data || [];
+  renderSidebarLangs();
+  renderLangScreens();
+}
+
+function renderSidebarLangs() {
+  const container = document.getElementById('sidebar-langs');
+  container.innerHTML = '';
+  userIdiomas.forEach(ui => {
+    const tagClass = { estudando: 'tag-studying', concluido: 'tag-done', a_fazer: 'tag-todo' }[ui.status] || 'tag-todo';
+    const tagText = { estudando: 'Estudando', concluido: 'Concluído', a_fazer: 'A fazer' }[ui.status] || 'A fazer';
+    const div = document.createElement('div');
+    div.className = 'nav-item';
+    div.id = 'nav-lang-' + ui.idioma_id;
+    div.innerHTML = `<span class="flag">${ui.idiomas.bandeira_emoji}</span> ${ui.idiomas.nome} <span class="nav-tag ${tagClass}">${tagText}</span>`;
+    div.onclick = () => showLang(ui.idioma_id);
+    container.appendChild(div);
+  });
+}
+
+function renderLangScreens() {
+  const container = document.getElementById('lang-screens');
+  container.innerHTML = '';
+  userIdiomas.forEach(ui => {
+    const div = document.createElement('div');
+    div.className = 'screen';
+    div.id = 'screen-lang-' + ui.idioma_id;
+    div.innerHTML = buildLangScreen(ui);
+    container.appendChild(div);
+  });
+}
+
+function buildLangScreen(ui) {
+  return `
+    <div class="lang-header">
+      <div class="lang-header-flag">${ui.idiomas.bandeira_emoji}</div>
+      <div>
+        <div class="lang-header-title">${ui.idiomas.nome}</div>
+        <div style="color:var(--text-muted);font-size:0.85rem">${ui.objetivo || 'viagem'} · ${ui.nivel || 'iniciante'}</div>
+      </div>
+      <div class="lang-header-prog">
+        <div class="lang-header-pct">${ui.progresso_pct || 0}% concluído</div>
+        <div class="prog-bar"><div class="prog-fill" style="width:${ui.progresso_pct || 0}%"></div></div>
+      </div>
+    </div>
+
+    <div class="lang-tabs">
+      <div class="lang-tab active" onclick="switchLangTab(${ui.idioma_id},'estudo',this)">📚 Diário de Bordo</div>
+      <div class="lang-tab" onclick="switchLangTab(${ui.idioma_id},'pratica',this)">🚀 Prática</div>
+    </div>
+
+    <div id="tab-estudo-${ui.idioma_id}">
+      <div class="connections-grid">
+        <div class="conn-card"><div class="conn-label">🔗 Link do Material</div><input class="conn-input" placeholder="Cole uma URL..." value="${ui.link_material || ''}" onchange="saveConn(${ui.idioma_id},'link_material',this.value)"></div>
+        <div class="conn-card"><div class="conn-label">🎧 Fonte</div><input class="conn-input" placeholder="Podcast, livro..." value="${ui.fonte || ''}" onchange="saveConn(${ui.idioma_id},'fonte',this.value)"></div>
+        <div class="conn-card"><div class="conn-label">📝 Anotações</div><textarea class="conn-input" placeholder="Suas notas livres..." rows="3" onchange="saveConn(${ui.idioma_id},'anotacoes',this.value)">${ui.anotacoes || ''}</textarea></div>
+      </div>
+
+      <div class="terms-header">
+        <div style="font-size:1rem;font-weight:800">🧳 Bagagem de Vocabulário</div>
+        <button class="btn-add" onclick="openModalTermo(${ui.idioma_id})">+ Novo Termo</button>
+      </div>
+      <div id="termos-list-${ui.idioma_id}">
+        <div class="empty-state"><div class="icon">🧳</div><p>Nenhum termo ainda. Adicione seu primeiro!</p></div>
+      </div>
+    </div>
+
+    <div id="tab-pratica-${ui.idioma_id}" style="display:none">
+      <div class="pratica-config">
+        <div class="pratica-config-title">⚙️ Configurar Prática</div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:10px">Tema do texto</div>
+        <div class="config-row" id="chips-tema-${ui.idioma_id}">
+          ${['Viagem','Restaurante','Hotel','Negócios','Cotidiano'].map(t=>`<div class="config-chip" onclick="selectChip(this,'${ui.idioma_id}','tema')">${t}</div>`).join('')}
+        </div>
+        <div style="font-size:0.8rem;color:var(--text-muted);margin:10px 0">Extensão</div>
+        <div class="config-row" id="chips-ext-${ui.idioma_id}">
+          ${['Curto','Médio','Longo'].map(t=>`<div class="config-chip" onclick="selectChip(this,'${ui.idioma_id}','ext')">${t}</div>`).join('')}
+        </div>
+        <button class="btn-gerar" onclick="gerarPratica(${ui.idioma_id})" id="btn-gerar-${ui.idioma_id}">✨ Gerar Prática</button>
+      </div>
+      <div id="pratica-resultado-${ui.idioma_id}"></div>
+    </div>
+  `;
+}
+
+async function saveConn(idiomaId, field, value) {
+  await sb.from('usuario_idiomas').update({ [field]: value })
+    .eq('usuario_id', currentUser.id).eq('idioma_id', idiomaId);
+}
+
+// ── NAVIGATION ──
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  document.getElementById('nav-' + name).classList.add('active');
+  if (name === 'painel') renderPainel();
+}
+
+function showLang(idiomaId) {
+  currentLangId = idiomaId;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  const screen = document.getElementById('screen-lang-' + idiomaId);
+  if (screen) screen.classList.add('active');
+  const nav = document.getElementById('nav-lang-' + idiomaId);
+  if (nav) nav.classList.add('active');
+  loadTermos(idiomaId);
+}
+
+function switchLangTab(idiomaId, tab, el) {
+  document.getElementById('tab-estudo-' + idiomaId).style.display = tab === 'estudo' ? 'block' : 'none';
+  document.getElementById('tab-pratica-' + idiomaId).style.display = tab === 'pratica' ? 'block' : 'none';
+  el.closest('.lang-tabs').querySelectorAll('.lang-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  if (tab === 'pratica') loadTermos(idiomaId);
+}
+
+// ── TERMOS ──
+async function loadTermos(idiomaId) {
+  const { data } = await sb.from('termos')
+    .select('*').eq('usuario_id', currentUser.id).eq('idioma_id', idiomaId)
+    .order('criado_em', { ascending: false });
+  currentLangTermos = data || [];
+  renderTermos(idiomaId, data || []);
+}
+
+function renderTermos(idiomaId, termos) {
+  const container = document.getElementById('termos-list-' + idiomaId);
+  if (!container) return;
+  if (!termos.length) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">🧳</div><p>Nenhum termo ainda. Adicione seu primeiro!</p></div>';
+    return;
+  }
+  container.innerHTML = termos.map(t => `
+    <div class="term-card" id="term-${t.id}">
+      <div class="term-header" onclick="toggleTerm('${t.id}')">
+        <div class="term-word">${t.termo}</div>
+        <div class="term-preview">${(t.significado || '').substring(0,40)}...</div>
+        <div class="term-chevron">▼</div>
+      </div>
+      <div class="term-body">
+        <div class="term-grid">
+          <div class="term-field"><label>Pronúncia</label><p>${t.pronuncia || '—'}</p></div>
+          <div class="term-field"><label>Significado</label><p>${t.significado || '—'}</p></div>
+          <div class="term-field"><label>Sinônimos</label><p>${(t.sinonimos || []).join(', ') || '—'}</p></div>
+          <div class="term-field"><label>Tema</label><p>${t.tema || '—'}</p></div>
+        </div>
+        ${t.frase_exemplo_1 || t.frase_exemplo_2 || t.frase_exemplo_3 ? `
+        <div class="term-frases">
+          <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:8px">Frases de Exemplo</div>
+          ${t.frase_exemplo_1 ? `<div class="term-frase">${t.frase_exemplo_1}</div>` : ''}
+          ${t.frase_exemplo_2 ? `<div class="term-frase">${t.frase_exemplo_2}</div>` : ''}
+          ${t.frase_exemplo_3 ? `<div class="term-frase">${t.frase_exemplo_3}</div>` : ''}
+        </div>` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleTerm(id) {
+  document.getElementById('term-' + id).classList.toggle('open');
+}
+
+let modalTermoIdiomaId = null;
+function openModalTermo(idiomaId) {
+  modalTermoIdiomaId = idiomaId;
+  ['mt-termo','mt-pronuncia','mt-significado','mt-sinonimos','mt-f1','mt-f2','mt-f3'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('mt-tema').value = '';
+  openModal('modal-termo');
+}
+
+async function saveTermo() {
+  const termo = document.getElementById('mt-termo').value.trim();
+  if (!termo) return showToast('Preencha o termo!', 'error');
+  const sinonimosRaw = document.getElementById('mt-sinonimos').value;
+  const sinonimos = sinonimosRaw ? sinonimosRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const { error } = await sb.from('termos').insert({
+    usuario_id: currentUser.id,
+    idioma_id: modalTermoIdiomaId,
+    termo,
+    pronuncia: document.getElementById('mt-pronuncia').value,
+    significado: document.getElementById('mt-significado').value,
+    sinonimos,
+    tema: document.getElementById('mt-tema').value,
+    frase_exemplo_1: document.getElementById('mt-f1').value,
+    frase_exemplo_2: document.getElementById('mt-f2').value,
+    frase_exemplo_3: document.getElementById('mt-f3').value,
+  });
+  if (error) return showToast('Erro ao salvar: ' + error.message, 'error');
+  closeModal('modal-termo');
+  showToast('Termo adicionado à bagagem! 🧳', 'success');
+  loadTermos(modalTermoIdiomaId);
+}
+
+// ── ADICIONAR IDIOMA ──
+const IDIOMAS_DISPONIVEIS = [
+  { id:1, nome:'Inglês', codigo:'en', bandeira_emoji:'🇺🇸' },
+  { id:2, nome:'Espanhol', codigo:'es', bandeira_emoji:'🇪🇸' },
+  { id:3, nome:'Mandarim', codigo:'zh', bandeira_emoji:'🇨🇳' },
+  { id:4, nome:'Francês', codigo:'fr', bandeira_emoji:'🇫🇷' },
+  { id:5, nome:'Alemão', codigo:'de', bandeira_emoji:'🇩🇪' },
+  { id:6, nome:'Italiano', codigo:'it', bandeira_emoji:'🇮🇹' },
+  { id:7, nome:'Japonês', codigo:'ja', bandeira_emoji:'🇯🇵' },
+  { id:8, nome:'Árabe', codigo:'ar', bandeira_emoji:'🇸🇦' },
+  { id:9, nome:'Russo', codigo:'ru', bandeira_emoji:'🇷🇺' },
+];
+
+function openAddLang() {
+  selectedNewLang = null;
+  const activeIds = userIdiomas.map(u => u.idioma_id);
+  const available = IDIOMAS_DISPONIVEIS.filter(l => !activeIds.includes(l.id));
+  const grid = document.getElementById('lang-options');
+  grid.innerHTML = available.map(l => `
+    <div class="lang-option" onclick="selectLang(this,${l.id})" data-id="${l.id}">
+      <span class="lang-option-flag">${l.bandeira_emoji}</span>${l.nome}
+    </div>
+  `).join('');
+  openModal('modal-lang');
+}
+
+function selectLang(el, id) {
+  document.querySelectorAll('.lang-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedNewLang = id;
+}
+
+async function addIdioma() {
+  if (!selectedNewLang) return showToast('Selecione um idioma!', 'error');
+  const objetivo = document.getElementById('ml-objetivo').value;
+  const nivel = document.getElementById('ml-nivel').value;
+  const { error } = await sb.from('usuario_idiomas').insert({
+    usuario_id: currentUser.id,
+    idioma_id: selectedNewLang,
+    objetivo, nivel, status: 'estudando'
+  });
+  if (error) return showToast('Erro: ' + error.message, 'error');
+  closeModal('modal-lang');
+  showToast('Novo destino adicionado! 🛫', 'success');
+  await loadIdiomas();
+}
+
+// ── PAINEL ──
+async function renderPainel() {
+  document.getElementById('stat-idiomas').textContent = userIdiomas.length;
+  document.getElementById('stat-conquistas').textContent = '2';
+
+  // Termos totais
+  const { count: cTermos } = await sb.from('termos').select('*', { count: 'exact', head: true }).eq('usuario_id', currentUser.id);
+  document.getElementById('stat-termos').textContent = cTermos || 0;
+
+  // Exercícios
+  const { count: cEx } = await sb.from('exercicios').select('*', { count: 'exact', head: true }).eq('usuario_id', currentUser.id);
+  document.getElementById('stat-exercicios').textContent = cEx || 0;
+
+  // Progresso por idioma
+  const prog = document.getElementById('painel-lang-progress');
+  if (!userIdiomas.length) {
+    prog.innerHTML = '<div class="empty-state"><div class="icon">🌍</div><p>Adicione seu primeiro idioma!</p></div>';
+  } else {
+    prog.innerHTML = userIdiomas.map(ui => `
+      <div class="lang-progress-item">
+        <div class="lang-flag">${ui.idiomas.bandeira_emoji}</div>
+        <div class="lang-info">
+          <div class="lang-name">${ui.idiomas.nome}</div>
+          <div class="lang-pct">${ui.progresso_pct || 0}%</div>
+          <div class="prog-bar"><div class="prog-fill" style="width:${ui.progresso_pct || 0}%"></div></div>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // Próximo destino no boarding pass
+  const estudando = userIdiomas.find(u => u.status === 'estudando');
+  document.getElementById('bp-dest').textContent = estudando ? estudando.idiomas.codigo.toUpperCase() : '???';
+}
+
+// ── PRÁTICA COM IA ──
+function selectChip(el, idiomaId, type) {
+  const group = document.getElementById('chips-' + type + '-' + idiomaId);
+  group.querySelectorAll('.config-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+function gerarExerciciosLocais(termos) {
+  const exercicios = [];
+  const shuffled = shuffle(termos);
+
+  shuffled.forEach(t => {
+    if (!t.termo || !t.significado) return;
+
+    exercicios.push({
+      tipo: 'flashcard',
+      enunciado: `Qual o significado de "${t.termo}"?`,
+      resposta: t.significado
+    });
+
+    if (t.frase_exemplo_1) {
+      const frase = t.frase_exemplo_1;
+      const re = new RegExp(t.termo, 'gi');
+      if (re.test(frase)) {
+        exercicios.push({
+          tipo: 'complete a frase',
+          enunciado: frase.replace(re, '_____'),
+          resposta: t.termo
+        });
+      }
+    }
+
+    if (t.sinonimos && t.sinonimos.length) {
+      exercicios.push({
+        tipo: 'sinônimos',
+        enunciado: `Cite um sinônimo de "${t.termo}"`,
+        resposta: t.sinonimos.join(', ')
+      });
+    }
+
+    exercicios.push({
+      tipo: 'crie uma frase',
+      enunciado: `Escreva uma frase usando "${t.termo}"`,
+      resposta: t.frase_exemplo_1 || t.frase_exemplo_2 || '(resposta livre)'
+    });
+  });
+
+  return shuffle(exercicios).slice(0, 6);
+}
+
+async function gerarPratica(idiomaId) {
+  const ui = userIdiomas.find(u => u.idioma_id === idiomaId);
+  if (!ui) return;
+
+  await loadTermos(idiomaId);
+  if (!currentLangTermos.length) return showToast('Adicione termos primeiro!', 'error');
+
+  const temaEl = document.querySelector(`#chips-tema-${idiomaId} .config-chip.selected`);
+  const tema = temaEl ? temaEl.textContent : 'Geral';
+
+  const filtrados = temaEl
+    ? currentLangTermos.filter(t => t.tema && t.tema.toLowerCase() === tema.toLowerCase())
+    : currentLangTermos;
+  const termosParaUsar = filtrados.length >= 2 ? filtrados : currentLangTermos;
+
+  const exercicios = gerarExerciciosLocais(termosParaUsar);
+  if (!exercicios.length) return showToast('Adicione termos com significado para praticar!', 'error');
+
+  const resultado = document.getElementById('pratica-resultado-' + idiomaId);
+  resultado.innerHTML = `
+    <div class="exercicios-list">
+      ${exercicios.map((ex, i) => `
+        <div class="exercicio-card">
+          <div class="ex-tipo">${ex.tipo}</div>
+          <div class="ex-enunciado">${ex.enunciado}</div>
+          <input class="ex-input" id="ex-input-${idiomaId}-${i}" placeholder="Sua resposta...">
+          <div class="ex-feedback" id="ex-fb-${idiomaId}-${i}"></div>
+          <div style="display:none" id="ex-resp-${idiomaId}-${i}">${ex.resposta}</div>
+        </div>
+      `).join('')}
+      <button class="btn-verificar" onclick="verificarExercicios(${idiomaId},${exercicios.length})">Verificar respostas ✅</button>
+    </div>
+  `;
+
+  await sb.from('sessoes_pratica').insert({
+    usuario_id: currentUser.id, idioma_id: idiomaId,
+    texto_gerado: '', tema,
+    total_exercicios: exercicios.length
+  }).catch(() => {});
+}
+
+async function verificarExercicios(idiomaId, count) {
+  let acertos = 0;
+  for (let i = 0; i < count; i++) {
+    const input = document.getElementById(`ex-input-${idiomaId}-${i}`);
+    const fb = document.getElementById(`ex-fb-${idiomaId}-${i}`);
+    const resp = document.getElementById(`ex-resp-${idiomaId}-${i}`).textContent;
+    const val = input.value.trim().toLowerCase();
+    if (val.length > 2) {
+      acertos++;
+      input.classList.add('correct');
+      fb.className = 'ex-feedback ok';
+      fb.textContent = '✅ Ótima resposta! Referência: ' + resp;
+      await sb.from('exercicios').insert({
+        usuario_id: currentUser.id, idioma_id: idiomaId,
+        tipo: 'crie_frase', enunciado: '', resposta_usuario: val, acertou: true
+      });
+    } else if (val.length > 0) {
+      input.classList.add('wrong');
+      fb.className = 'ex-feedback err';
+      fb.textContent = '💡 Resposta esperada: ' + resp;
+    }
+  }
+  showToast(`${acertos}/${count} exercícios respondidos! 🎯`, 'success');
+}
+
+// ── MODALS ──
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ── TOAST ──
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ── AUTH LISTENER ──
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session) await enterApp(session.user);
+});
+
+init();
+</script>
+</body>
+</html>
