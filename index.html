@@ -624,7 +624,7 @@ function buildLangScreen(ui) {
         <div class="config-row" id="chips-ext-${ui.idioma_id}">
           ${['Curto','Médio','Longo'].map(t=>`<div class="config-chip" onclick="selectChip(this,'${ui.idioma_id}','ext')">${t}</div>`).join('')}
         </div>
-        <button class="btn-gerar" onclick="gerarPratica(${ui.idioma_id})" id="btn-gerar-${ui.idioma_id}">✨ Gerar Prática</button>
+        <button class="btn-gerar" onclick="gerarPratica(${ui.idioma_id})" id="btn-gerar-${ui.idioma_id}">✨ Gerar Prática com IA</button>
       </div>
       <div id="pratica-resultado-${ui.idioma_id}"></div>
     </div>
@@ -830,55 +830,6 @@ function selectChip(el, idiomaId, type) {
   el.classList.add('selected');
 }
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
-  return a;
-}
-
-function gerarExerciciosLocais(termos) {
-  const exercicios = [];
-  const shuffled = shuffle(termos);
-
-  shuffled.forEach(t => {
-    if (!t.termo || !t.significado) return;
-
-    exercicios.push({
-      tipo: 'flashcard',
-      enunciado: `Qual o significado de "${t.termo}"?`,
-      resposta: t.significado
-    });
-
-    if (t.frase_exemplo_1) {
-      const frase = t.frase_exemplo_1;
-      const re = new RegExp(t.termo, 'gi');
-      if (re.test(frase)) {
-        exercicios.push({
-          tipo: 'complete a frase',
-          enunciado: frase.replace(re, '_____'),
-          resposta: t.termo
-        });
-      }
-    }
-
-    if (t.sinonimos && t.sinonimos.length) {
-      exercicios.push({
-        tipo: 'sinônimos',
-        enunciado: `Cite um sinônimo de "${t.termo}"`,
-        resposta: t.sinonimos.join(', ')
-      });
-    }
-
-    exercicios.push({
-      tipo: 'crie uma frase',
-      enunciado: `Escreva uma frase usando "${t.termo}"`,
-      resposta: t.frase_exemplo_1 || t.frase_exemplo_2 || '(resposta livre)'
-    });
-  });
-
-  return shuffle(exercicios).slice(0, 6);
-}
-
 async function gerarPratica(idiomaId) {
   const ui = userIdiomas.find(u => u.idioma_id === idiomaId);
   if (!ui) return;
@@ -887,37 +838,85 @@ async function gerarPratica(idiomaId) {
   if (!currentLangTermos.length) return showToast('Adicione termos primeiro!', 'error');
 
   const temaEl = document.querySelector(`#chips-tema-${idiomaId} .config-chip.selected`);
-  const tema = temaEl ? temaEl.textContent : 'Geral';
+  const extEl = document.querySelector(`#chips-ext-${idiomaId} .config-chip.selected`);
+  const tema = temaEl ? temaEl.textContent : 'cotidiano';
+  const ext = extEl ? extEl.textContent : 'médio';
 
-  const filtrados = temaEl
-    ? currentLangTermos.filter(t => t.tema && t.tema.toLowerCase() === tema.toLowerCase())
-    : currentLangTermos;
-  const termosParaUsar = filtrados.length >= 2 ? filtrados : currentLangTermos;
-
-  const exercicios = gerarExerciciosLocais(termosParaUsar);
-  if (!exercicios.length) return showToast('Adicione termos com significado para praticar!', 'error');
+  const termosList = currentLangTermos.map(t => t.termo).join(', ');
+  const btn = document.getElementById('btn-gerar-' + idiomaId);
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading"></span> Gerando...';
 
   const resultado = document.getElementById('pratica-resultado-' + idiomaId);
-  resultado.innerHTML = `
-    <div class="exercicios-list">
-      ${exercicios.map((ex, i) => `
-        <div class="exercicio-card">
-          <div class="ex-tipo">${ex.tipo}</div>
-          <div class="ex-enunciado">${ex.enunciado}</div>
-          <input class="ex-input" id="ex-input-${idiomaId}-${i}" placeholder="Sua resposta...">
-          <div class="ex-feedback" id="ex-fb-${idiomaId}-${i}"></div>
-          <div style="display:none" id="ex-resp-${idiomaId}-${i}">${ex.resposta}</div>
-        </div>
-      `).join('')}
-      <button class="btn-verificar" onclick="verificarExercicios(${idiomaId},${exercicios.length})">Verificar respostas ✅</button>
-    </div>
-  `;
+  resultado.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-muted)"><span class="loading" style="border-color:var(--border);border-top-color:var(--primary)"></span> A IA está preparando sua prática...</div>';
 
-  await sb.from('sessoes_pratica').insert({
-    usuario_id: currentUser.id, idioma_id: idiomaId,
-    texto_gerado: '', tema,
-    total_exercicios: exercicios.length
-  }).catch(() => {});
+  try {
+    const prompt = `Você é um professor de ${ui.idiomas.nome}. Crie uma prática personalizada com:
+- Um texto ${ext.toLowerCase()} (${ext === 'Curto' ? '80' : ext === 'Médio' ? '150' : '250'} palavras) sobre o tema "${tema}" em ${ui.idiomas.nome}
+- Os seguintes termos DEVEM aparecer no texto: ${termosList}
+- 3 exercícios: 1 complete a frase, 1 tradução, 1 crie uma frase
+
+Responda APENAS em JSON válido sem markdown, sem backticks:
+{
+  "texto": "...",
+  "termos_usados": ["termo1","termo2"],
+  "exercicios": [
+    {"tipo":"complete_frase","enunciado":"...(_____)...","resposta":"..."},
+    {"tipo":"traducao","enunciado":"Traduza: ...","resposta":"..."},
+    {"tipo":"crie_frase","enunciado":"Crie uma frase com: ...","resposta":"exemplo de resposta"}
+  ]
+}`;
+
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await response.json();
+    const raw = data.content.map(i => i.text || '').join('').replace(/```json|```/g, '').trim();
+    const pratica = JSON.parse(raw);
+
+    let textoHtml = pratica.texto;
+    (pratica.termos_usados || []).forEach(t => {
+      const re = new RegExp(`(${t})`, 'gi');
+      textoHtml = textoHtml.replace(re, '<span class="termo-highlight">$1</span>');
+    });
+
+    resultado.innerHTML = `
+      <div class="pratica-texto">
+        <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);margin-bottom:12px">📖 Texto de Prática — ${tema}</div>
+        <p>${textoHtml}</p>
+      </div>
+      <div class="exercicios-list">
+        ${pratica.exercicios.map((ex, i) => `
+          <div class="exercicio-card">
+            <div class="ex-tipo">${ex.tipo.replace('_',' ')}</div>
+            <div class="ex-enunciado">${ex.enunciado}</div>
+            <input class="ex-input" id="ex-input-${idiomaId}-${i}" placeholder="Sua resposta...">
+            <div class="ex-feedback" id="ex-fb-${idiomaId}-${i}"></div>
+            <div style="display:none" id="ex-resp-${idiomaId}-${i}">${ex.resposta}</div>
+          </div>
+        `).join('')}
+        <button class="btn-verificar" onclick="verificarExercicios(${idiomaId},${pratica.exercicios.length})">Verificar respostas ✅</button>
+      </div>
+    `;
+
+    // Salva sessão
+    await sb.from('sessoes_pratica').insert({
+      usuario_id: currentUser.id, idioma_id: idiomaId,
+      texto_gerado: pratica.texto, tema,
+      total_exercicios: pratica.exercicios.length
+    });
+
+  } catch(e) {
+    resultado.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div><p>Erro ao gerar prática. Tente novamente.</p></div>';
+  }
+  btn.disabled = false;
+  btn.innerHTML = '✨ Gerar Nova Prática';
 }
 
 async function verificarExercicios(idiomaId, count) {
