@@ -1599,6 +1599,7 @@ function gerarExerciciosLocais(termos, langCode, tema, nivel) {
     if (t.significado) {
       exercicios.push({
         tipo: 'flashcard',
+        termo: t.termo,
         enunciado: `Qual o significado de "${t.termo}"?`,
         resposta: t.significado
       });
@@ -1609,6 +1610,7 @@ function gerarExerciciosLocais(termos, langCode, tema, nivel) {
       if (re.test(f.frase)) {
         exercicios.push({
           tipo: 'complete a frase',
+          termo: t.termo,
           enunciado: f.frase.replace(re, '_____'),
           resposta: t.termo
         });
@@ -1618,14 +1620,17 @@ function gerarExerciciosLocais(termos, langCode, tema, nivel) {
     if (t.sinonimos && t.sinonimos.length) {
       exercicios.push({
         tipo: 'sinônimos',
+        termo: t.termo,
         enunciado: `Cite um sinônimo de "${t.termo}"`,
-        resposta: t.sinonimos.join(', ')
+        resposta: t.sinonimos.join(', '),
+        sinonimos: t.sinonimos
       });
     }
 
     const fraseRef = frases.length ? frases[0].frase : (t.frase_exemplo_1 || t.frase_exemplo_2 || '(resposta livre)');
     exercicios.push({
       tipo: 'crie uma frase',
+      termo: t.termo,
       enunciado: `Escreva uma frase usando "${t.termo}"`,
       resposta: fraseRef
     });
@@ -1635,6 +1640,7 @@ function gerarExerciciosLocais(termos, langCode, tema, nivel) {
       const re2 = new RegExp(`(${t.termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
       exercicios.push({
         tipo: 'leitura',
+        termo: t.termo,
         enunciado: fraseDestaque.frase.replace(re2, '<strong style="color:var(--accent)">$1</strong>'),
         resposta: t.significado || t.termo
       });
@@ -1674,6 +1680,9 @@ async function gerarPratica(idiomaId) {
           ${ex.tipo === 'leitura' ? '' : `<input class="ex-input" id="ex-input-${idiomaId}-${i}" placeholder="Sua resposta...">`}
           <div class="ex-feedback" id="ex-fb-${idiomaId}-${i}"></div>
           <div style="display:none" id="ex-resp-${idiomaId}-${i}">${ex.resposta}</div>
+          <div style="display:none" id="ex-type-${idiomaId}-${i}">${ex.tipo}</div>
+          <div style="display:none" id="ex-term-${idiomaId}-${i}">${ex.termo || ''}</div>
+          <div style="display:none" id="ex-sins-${idiomaId}-${i}">${JSON.stringify(ex.sinonimos || [])}</div>
         </div>
       `).join('')}
       <button class="btn-verificar" onclick="verificarExercicios(${idiomaId},${exercicios.length})">Verificar respostas ✅</button>
@@ -1687,29 +1696,142 @@ async function gerarPratica(idiomaId) {
   }).catch(() => {});
 }
 
+function normalizarTexto(t) {
+  return t.toLowerCase().trim()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[.,!?;:'"()]/g, '').replace(/\s+/g, ' ');
+}
+
+function similaridade(a, b) {
+  const na = normalizarTexto(a), nb = normalizarTexto(b);
+  if (na === nb) return 1;
+  if (na.includes(nb) || nb.includes(na)) return 0.85;
+  const wordsA = na.split(' '), wordsB = nb.split(' ');
+  const common = wordsA.filter(w => wordsB.includes(w)).length;
+  return common / Math.max(wordsA.length, wordsB.length);
+}
+
+function verificarFlashcard(val, respEsperada) {
+  const sim = similaridade(val, respEsperada);
+  if (sim >= 0.7) return { ok: true, msg: '✅ Correto! Resposta de referência: ' + respEsperada };
+  const palavrasResp = normalizarTexto(respEsperada).split(' ');
+  const palavrasVal = normalizarTexto(val).split(' ');
+  const acertou = palavrasResp.some(p => p.length > 2 && palavrasVal.includes(p));
+  if (acertou) return { ok: true, msg: '✅ Quase! Resposta completa: ' + respEsperada };
+  return { ok: false, msg: '💡 Resposta esperada: ' + respEsperada };
+}
+
+function verificarCompleteFrase(val, termoEsperado) {
+  const sim = similaridade(val, termoEsperado);
+  if (sim >= 0.8) return { ok: true, msg: '✅ Correto!' };
+  if (normalizarTexto(val).includes(normalizarTexto(termoEsperado))) return { ok: true, msg: '✅ Correto! O termo era: ' + termoEsperado };
+  return { ok: false, msg: '💡 O termo correto é: ' + termoEsperado };
+}
+
+function verificarSinonimos(val, sinonimosStr, sinonimosArr) {
+  const nVal = normalizarTexto(val);
+  let lista = [];
+  try { lista = sinonimosArr.length ? sinonimosArr : sinonimosStr.split(',').map(s => s.trim()); } catch(e) { lista = sinonimosStr.split(',').map(s => s.trim()); }
+  const acertou = lista.some(s => similaridade(nVal, s) >= 0.7);
+  if (acertou) return { ok: true, msg: '✅ Correto! Sinônimos: ' + lista.join(', ') };
+  return { ok: false, msg: '💡 Sinônimos esperados: ' + lista.join(', ') };
+}
+
+function verificarCrieFrase(val, termo, langCode) {
+  const nVal = normalizarTexto(val);
+  const nTermo = normalizarTexto(termo);
+  const erros = [];
+
+  if (!nVal.includes(nTermo)) {
+    erros.push(`A frase deve conter o termo "${termo}"`);
+  }
+
+  const palavras = val.trim().split(/\s+/);
+  if (palavras.length < 3) {
+    erros.push('A frase deve ter pelo menos 3 palavras');
+  }
+
+  const original = val.trim();
+  if (original.length > 0 && original[0] !== original[0].toUpperCase()) {
+    erros.push('A frase deve começar com letra maiúscula');
+  }
+
+  if (original.length > 0 && !/[.!?。！？]$/.test(original)) {
+    erros.push('A frase deve terminar com pontuação (. ! ?)');
+  }
+
+  if (langCode === 'en') {
+    if (/\bi\b/.test(val) && !/\bI\b/.test(val)) erros.push('"I" deve ser maiúsculo em inglês');
+    if (/\b(he|she|it)\s+(have|go|do|like|need|want|make|take|come|know|think|say|get|find|give|tell|work|call|try|ask|use|look)\b/i.test(val)) {
+      erros.push('Verifique a conjugação do verbo na 3ª pessoa (he/she/it + verbo+s)');
+    }
+  }
+
+  if (langCode === 'es') {
+    if (/\b(el|ella|usted)\s+(tener|hacer|ir|ser|estar|poder|decir|saber|querer|venir)\b/i.test(val)) {
+      erros.push('Verifique a conjugação do verbo (forma infinitiva detectada após pronome)');
+    }
+  }
+
+  if (erros.length === 0) return { ok: true, msg: '✅ Frase bem construída!' };
+  return { ok: false, msg: '⚠️ ' + erros.join('. ') + '.' };
+}
+
 async function verificarExercicios(idiomaId, count) {
   let acertos = 0;
+  const langCode = getLangCode(idiomaId);
+
   for (let i = 0; i < count; i++) {
     const input = document.getElementById(`ex-input-${idiomaId}-${i}`);
+    if (!input) continue;
     const fb = document.getElementById(`ex-fb-${idiomaId}-${i}`);
     const resp = document.getElementById(`ex-resp-${idiomaId}-${i}`).textContent;
-    const val = input.value.trim().toLowerCase();
-    if (val.length > 2) {
+    const tipo = document.getElementById(`ex-type-${idiomaId}-${i}`).textContent;
+    const termo = document.getElementById(`ex-term-${idiomaId}-${i}`).textContent;
+    let sinonimosArr = [];
+    try { sinonimosArr = JSON.parse(document.getElementById(`ex-sins-${idiomaId}-${i}`).textContent); } catch(e) {}
+
+    const val = input.value.trim();
+    if (!val) continue;
+
+    let resultado;
+    switch(tipo) {
+      case 'flashcard':
+        resultado = verificarFlashcard(val, resp);
+        break;
+      case 'complete a frase':
+        resultado = verificarCompleteFrase(val, resp);
+        break;
+      case 'sinônimos':
+        resultado = verificarSinonimos(val, resp, sinonimosArr);
+        break;
+      case 'crie uma frase':
+        resultado = verificarCrieFrase(val, termo, langCode);
+        break;
+      default:
+        resultado = { ok: val.length > 0, msg: val.length > 0 ? '✅ Resposta registrada.' : '' };
+    }
+
+    if (resultado.ok) {
       acertos++;
       input.classList.add('correct');
       fb.className = 'ex-feedback ok';
-      fb.textContent = '✅ Ótima resposta! Referência: ' + resp;
+      fb.textContent = resultado.msg;
       await sb.from('exercicios').insert({
         usuario_id: currentUser.id, idioma_id: idiomaId,
-        tipo: 'crie_frase', enunciado: '', resposta_usuario: val, acertou: true
-      });
-    } else if (val.length > 0) {
+        tipo, enunciado: '', resposta_usuario: val, acertou: true
+      }).catch(() => {});
+    } else {
       input.classList.add('wrong');
       fb.className = 'ex-feedback err';
-      fb.textContent = '💡 Resposta esperada: ' + resp;
+      fb.textContent = resultado.msg;
+      await sb.from('exercicios').insert({
+        usuario_id: currentUser.id, idioma_id: idiomaId,
+        tipo, enunciado: '', resposta_usuario: val, acertou: false
+      }).catch(() => {});
     }
   }
-  showToast(`${acertos}/${count} exercícios respondidos! 🎯`, 'success');
+  showToast(`${acertos}/${count} exercícios corretos! 🎯`, 'success');
 }
 
 // ── MODALS ──
