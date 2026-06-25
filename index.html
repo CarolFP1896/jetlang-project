@@ -620,10 +620,6 @@ function buildLangScreen(ui) {
         <div class="config-row" id="chips-tema-${ui.idioma_id}">
           ${['Viagem','Restaurante','Hotel','Negócios','Cotidiano'].map(t=>`<div class="config-chip" onclick="selectChip(this,'${ui.idioma_id}','tema')">${t}</div>`).join('')}
         </div>
-        <div style="font-size:0.8rem;color:var(--text-muted);margin:10px 0">Extensão</div>
-        <div class="config-row" id="chips-ext-${ui.idioma_id}">
-          ${['Curto','Médio','Longo'].map(t=>`<div class="config-chip" onclick="selectChip(this,'${ui.idioma_id}','ext')">${t}</div>`).join('')}
-        </div>
         <button class="btn-gerar" onclick="gerarPratica(${ui.idioma_id})" id="btn-gerar-${ui.idioma_id}">✨ Gerar Prática</button>
       </div>
       <div id="pratica-resultado-${ui.idioma_id}"></div>
@@ -823,7 +819,762 @@ async function renderPainel() {
   document.getElementById('bp-dest').textContent = estudando ? estudando.idiomas.codigo.toUpperCase() : '???';
 }
 
-// ── PRÁTICA COM IA ──
+// ── BANCO DE FRASES ──
+const FRASES_DB = {
+  en: {
+    Viagem: {
+      iniciante: {
+        'hello': ['Hello, how are you?','Hello, nice to meet you.','Hello, my name is Anna.'],
+        'hi': ['Hi, what is your name?','Hi there, welcome!','Hi, how is it going?'],
+        'goodbye': ['Goodbye, see you tomorrow.','Goodbye, have a nice trip.','Goodbye, take care.'],
+        'please': ['Please help me.','Can you please show me the way?','Please wait here.'],
+        'thank you': ['Thank you very much.','Thank you for your help.','Thank you, that is very kind.'],
+        'yes': ['Yes, I would like that.','Yes, please.','Yes, that is correct.'],
+        'no': ['No, thank you.','No, I do not understand.','No, that is not right.'],
+        'where': ['Where is the airport?','Where can I find a taxi?','Where is the bus stop?'],
+        'how much': ['How much does this cost?','How much is the ticket?','How much do I owe you?'],
+        'help': ['Can you help me?','I need help, please.','Help me find my hotel.'],
+        'water': ['Can I have some water?','I need water, please.','Where can I buy water?'],
+        'ticket': ['I need a ticket.','Where can I buy a ticket?','One ticket, please.'],
+        'hotel': ['Where is the hotel?','I have a hotel reservation.','Take me to the hotel, please.'],
+        'airport': ['How do I get to the airport?','The airport is far from here.','I need to go to the airport.'],
+        'taxi': ['I need a taxi.','Can you call a taxi?','How much is the taxi to the center?'],
+      },
+      básico: {
+        'hello': ['Hello, I just arrived and I am looking for the tourist information center.','Hello, could you tell me where the nearest metro station is?','Hello, do you speak English? I need some directions.'],
+        'thank you': ['Thank you for the recommendation, I will definitely visit that place.','Thank you so much, you have been really helpful.','Thank you, I appreciate your patience with my questions.'],
+        'where': ['Where can I exchange money around here?','Where would you recommend I go for dinner?','Where is the closest pharmacy?'],
+        'how much': ['How much would it cost to rent a car for the weekend?','How much is the entrance fee to the museum?','How much should I tip at a restaurant?'],
+        'book': ['I would like to book a room for two nights.','Can I book a table for four people?','I forgot to book in advance, is there availability?'],
+        'reservation': ['I have a reservation under the name Smith.','My reservation is for three nights.','Can I change my reservation to a later date?'],
+        'lost': ['I think I am lost, can you help me?','I got lost trying to find the train station.','My luggage got lost at the airport.'],
+        'recommend': ['Can you recommend a good local restaurant?','What do you recommend I visit in this city?','Would you recommend taking the bus or the train?'],
+        'directions': ['Can you give me directions to the beach?','I need directions to the nearest hospital.','The directions on the map are confusing.'],
+        'delay': ['My flight has a two-hour delay.','Is there a delay on this train line?','Sorry for the delay, the traffic was terrible.'],
+      },
+      intermediário: {
+        'although': ['Although the flight was delayed, we still managed to catch the connecting bus.','Although I had booked in advance, the hotel had no record of my reservation.','Although the weather was bad, the trip was still enjoyable.'],
+        'despite': ['Despite the language barrier, we communicated well with the locals.','Despite missing the train, we arrived on time by taking a taxi.','Despite the high prices, the experience was worth every penny.'],
+        'whereas': ['Whereas the first hotel was luxurious, the second one was more of a budget option.','I prefer traveling by train, whereas my partner prefers flying.','The north of the country is cold, whereas the south is warm and sunny.'],
+        'eventually': ['We eventually found our way after asking several people for directions.','The delayed flight eventually departed three hours late.','I eventually learned enough of the language to get by on my own.'],
+        'available': ['Are there any rooms available for tonight?','Is this tour available in English?','The early morning flight was no longer available.'],
+        'convenient': ['The hotel location was very convenient for sightseeing.','It would be more convenient to rent a car than to rely on public transport.','Is there a more convenient time for the city tour?'],
+      },
+      avançado: {
+        'itinerary': ['I have meticulously planned our itinerary to include both cultural landmarks and hidden gems.','The travel agent suggested an alternative itinerary to avoid peak tourist season.','Our itinerary had to be completely restructured due to the airline strike.'],
+        'immerse': ['I prefer to immerse myself in the local culture rather than stick to tourist attractions.','To truly immerse yourself in a new country, try staying in local guesthouses.','She chose a homestay program to immerse herself in the language.'],
+        'off the beaten path': ['We discovered an off the beaten path village that was absolutely charming.','The best experiences come from going off the beaten path.','Our guide took us off the beaten path to a stunning waterfall.'],
+        'wanderlust': ['Her wanderlust led her to visit over forty countries before turning thirty.','The documentary awakened a deep wanderlust in me.','Wanderlust runs in our family; we can never stay in one place for long.'],
+      },
+    },
+    Restaurante: {
+      iniciante: {
+        'menu': ['Can I see the menu?','The menu looks great.','Is there a menu in English?'],
+        'water': ['A glass of water, please.','Can I have still water?','Is the water free?'],
+        'food': ['The food is delicious.','I love this food.','What food do you recommend?'],
+        'order': ['I would like to order now.','Can I order a coffee?','My order is not here yet.'],
+        'bill': ['Can I have the bill?','The bill, please.','Is the tip included in the bill?'],
+        'table': ['A table for two, please.','Is this table free?','Can we have a table by the window?'],
+        'eat': ['I want to eat something light.','Where can I eat around here?','Let us eat here.'],
+        'drink': ['What would you like to drink?','I would like a cold drink.','Can I have something to drink?'],
+        'delicious': ['This is delicious!','The soup is delicious.','Everything was delicious, thank you.'],
+        'hungry': ['I am very hungry.','Are you hungry?','I am not very hungry.'],
+      },
+      básico: {
+        'appetizer': ['What appetizers do you have today?','I will start with an appetizer.','The appetizer was so good we ordered another one.'],
+        'dessert': ['Do you have any desserts?','I am too full for dessert.','The chocolate dessert is amazing here.'],
+        'allergy': ['I have a nut allergy.','Do you have allergy information for this dish?','My friend has a gluten allergy.'],
+        'spicy': ['Is this dish spicy?','I do not like spicy food.','Can you make it less spicy?'],
+        'vegetarian': ['Do you have vegetarian options?','I am vegetarian.','Is this dish vegetarian?'],
+        'recommend': ['What do you recommend from the menu?','The waiter recommended the fish.','I recommend the pasta, it is excellent.'],
+        'reservation': ['I have a reservation at eight.','Do I need a reservation?','We forgot to make a reservation.'],
+        'waiter': ['Excuse me, waiter!','The waiter was very friendly.','Our waiter recommended the daily special.'],
+      },
+      intermediário: {
+        'compliments to the chef': ['Please send my compliments to the chef, the meal was outstanding.','Compliments to the chef, every dish was perfectly seasoned.','I would like to send my compliments to the chef for such a creative menu.'],
+        'cuisine': ['This restaurant is known for its fusion cuisine.','Italian cuisine is my favorite.','The cuisine here blends traditional and modern techniques.'],
+        'portion': ['The portions here are very generous.','Could I have a smaller portion?','The portion size was perfect for sharing.'],
+        'course': ['For the main course, I will have the steak.','How many courses does the tasting menu include?','The second course was the highlight of the meal.'],
+      },
+      avançado: {
+        'palate': ['The combination of flavors truly delighted the palate.','This wine has a complex palate with notes of cherry and oak.','A well-trained palate can distinguish subtle differences in seasoning.'],
+        'sommelier': ['The sommelier recommended a perfect pairing for our main course.','I asked the sommelier to suggest a wine within our budget.','A skilled sommelier can elevate the entire dining experience.'],
+        'gastronomic': ['The city is renowned for its gastronomic scene.','We signed up for a gastronomic tour of the region.','The restaurant offers a gastronomic experience unlike any other.'],
+      },
+    },
+    Hotel: {
+      iniciante: {
+        'room': ['I need a room for one night.','Is the room clean?','My room number is 302.'],
+        'key': ['I lost my room key.','Can I have an extra key?','The key does not work.'],
+        'check-in': ['What time is check-in?','I would like to check in.','Early check-in, please.'],
+        'check-out': ['What time is check-out?','I need a late check-out.','I want to check out now.'],
+        'bed': ['I need a bigger bed.','The bed is very comfortable.','Can I have an extra bed?'],
+        'bathroom': ['The bathroom is small.','Is there a bathroom in the room?','The bathroom needs towels.'],
+        'wifi': ['What is the wifi password?','Is the wifi free?','The wifi is not working.'],
+        'breakfast': ['Is breakfast included?','What time is breakfast?','Where is breakfast served?'],
+      },
+      básico: {
+        'amenities': ['What amenities does the hotel offer?','The amenities in the room include a minibar and safe.','The hotel amenities were better than expected.'],
+        'available': ['Is a room with a sea view available?','Are there any suites available for this weekend?','The pool is available until ten at night.'],
+        'complaint': ['I would like to make a complaint about the noise.','My complaint was handled quickly by the staff.','We had no complaints about our stay.'],
+        'housekeeping': ['Can I request housekeeping?','Housekeeping did a wonderful job.','Please skip housekeeping today.'],
+        'reception': ['I left a message at reception.','The reception is on the ground floor.','Can you call reception for me?'],
+        'luggage': ['Can you store my luggage?','My luggage is still in the car.','Where can I leave my luggage after check-out?'],
+      },
+      intermediário: {
+        'accommodate': ['Can the hotel accommodate a late arrival?','The suite can accommodate up to four guests.','They were happy to accommodate our special request.'],
+        'complimentary': ['The hotel offers complimentary breakfast and parking.','Is the airport shuttle complimentary?','We received a complimentary upgrade to a suite.'],
+        'inconvenience': ['We apologize for the inconvenience caused by the renovation work.','The noise was a major inconvenience during our stay.','Despite the inconvenience, the staff handled it professionally.'],
+      },
+      avançado: {
+        'concierge': ['The concierge arranged a private tour of the old town for us.','I asked the concierge to secure reservations at the most exclusive restaurant.','A good concierge can transform an ordinary trip into an extraordinary one.'],
+        'impeccable': ['The service at this hotel is impeccable.','The rooms were kept in impeccable condition throughout our stay.','The staff maintained impeccable professionalism at all times.'],
+      },
+    },
+    'Negócios': {
+      iniciante: {
+        'meeting': ['I have a meeting at ten.','The meeting is important.','Where is the meeting room?'],
+        'email': ['I will send you an email.','Did you get my email?','Please check your email.'],
+        'work': ['I work in marketing.','Nice work on the project.','Where do you work?'],
+        'office': ['The office is on the fifth floor.','I am at the office now.','Our office is downtown.'],
+        'phone': ['Can I use the phone?','My phone number is on the card.','I will call you on the phone.'],
+        'name': ['My name is on the badge.','What is your company name?','I forgot his name.'],
+      },
+      básico: {
+        'deadline': ['The deadline for the project is next Friday.','Can we extend the deadline by a week?','We must meet the deadline.'],
+        'schedule': ['Let me check my schedule.','I will schedule a call for tomorrow.','The schedule is very tight this week.'],
+        'negotiate': ['We need to negotiate better terms.','I will negotiate the contract this afternoon.','They are willing to negotiate on the price.'],
+        'presentation': ['The presentation went very well.','I have a presentation tomorrow morning.','Could you prepare a presentation on the quarterly results?'],
+        'colleague': ['Let me introduce you to my colleague.','My colleague will handle this matter.','I discussed it with my colleague.'],
+      },
+      intermediário: {
+        'stakeholder': ['All key stakeholders need to approve the proposal before we proceed.','Managing stakeholder expectations is crucial for project success.','We scheduled a meeting with the primary stakeholders.'],
+        'leverage': ['We can leverage our existing partnerships to enter new markets.','The company plans to leverage technology to improve efficiency.','They used their market position to leverage a better deal.'],
+        'scalable': ['We need a scalable solution that can grow with the company.','The current system is not scalable enough for our needs.','Building a scalable infrastructure is our top priority this quarter.'],
+      },
+      avançado: {
+        'synergy': ['The merger is expected to create significant synergies between the two companies.','We identified key areas of synergy during the due diligence process.','The synergy between our teams led to an innovative product launch.'],
+        'due diligence': ['The legal team is conducting due diligence on the acquisition target.','Thorough due diligence revealed some concerning financial irregularities.','Due diligence is a critical step before any major investment decision.'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        'good morning': ['Good morning, how did you sleep?','Good morning, it is a beautiful day.','Good morning, would you like some coffee?'],
+        'sorry': ['I am sorry, I did not hear you.','Sorry, I am late.','I am sorry about that.'],
+        'time': ['What time is it?','I do not have time now.','It is time to go.'],
+        'today': ['What are you doing today?','Today is Monday.','I am busy today.'],
+        'like': ['I like this city.','Do you like coffee?','I would like to go shopping.'],
+        'want': ['I want to learn English.','Do you want to eat?','I want to go home.'],
+        'need': ['I need to study more.','Do you need anything?','I need a break.'],
+        'good': ['That is a good idea.','The weather is good today.','Good job!'],
+        'friend': ['She is my friend.','I am meeting a friend.','My friend speaks English.'],
+        'family': ['I miss my family.','My family is from Brazil.','Family is very important.'],
+      },
+      básico: {
+        'actually': ['I actually prefer tea over coffee.','Actually, I have already been there.','The movie was actually better than I expected.'],
+        'pretty': ['The weather is pretty cold today.','She did a pretty good job.','It is pretty far from here.'],
+        'stuff': ['I have a lot of stuff to do today.','Where did you put your stuff?','We talked about interesting stuff.'],
+        'figure out': ['I need to figure out the bus schedule.','Let me figure out what happened.','We will figure out a solution.'],
+        'hang out': ['Do you want to hang out this weekend?','We usually hang out at the park.','I like to hang out with friends after work.'],
+        'get along': ['I get along well with my neighbors.','They do not get along very well.','It is important to get along with your coworkers.'],
+      },
+      intermediário: {
+        'take for granted': ['We often take for granted the little things in life.','Do not take your health for granted.','I used to take for granted how easy it was to see friends.'],
+        'get the hang of': ['I am starting to get the hang of cooking.','Once you get the hang of it, it becomes much easier.','It took me a while to get the hang of the new software.'],
+        'go with the flow': ['Sometimes it is better to just go with the flow.','She is the type of person who likes to go with the flow.','I decided to go with the flow instead of stressing about the plans.'],
+      },
+      avançado: {
+        'nuance': ['There is a subtle nuance in meaning between the two expressions.','Understanding cultural nuance is key to effective communication.','The nuance of her argument was lost in translation.'],
+        'eloquent': ['She gave an eloquent speech at the graduation ceremony.','His eloquent writing style captivated readers worldwide.','Finding the right words to be eloquent in a second language is challenging.'],
+      },
+    },
+  },
+  es: {
+    Viagem: {
+      iniciante: {
+        'hola': ['Hola, ¿cómo estás?','Hola, mucho gusto.','Hola, me llamo Ana.'],
+        'gracias': ['Muchas gracias por tu ayuda.','Gracias, eres muy amable.','Gracias por todo.'],
+        'por favor': ['Por favor, ¿dónde está el baño?','Ayúdame, por favor.','Un café, por favor.'],
+        'adiós': ['Adiós, nos vemos mañana.','Adiós, buen viaje.','Adiós, cuídate mucho.'],
+        'dónde': ['¿Dónde está el aeropuerto?','¿Dónde puedo tomar un taxi?','¿Dónde queda el hotel?'],
+        'cuánto': ['¿Cuánto cuesta esto?','¿Cuánto es el boleto?','¿Cuánto le debo?'],
+        'agua': ['Un vaso de agua, por favor.','¿Dónde puedo comprar agua?','Necesito agua.'],
+        'ayuda': ['Necesito ayuda.','¿Me puedes ayudar?','Ayuda, estoy perdido.'],
+        'hotel': ['¿Dónde está el hotel?','Tengo una reserva en el hotel.','Lléveme al hotel, por favor.'],
+        'taxi': ['Necesito un taxi.','¿Puede llamar un taxi?','¿Cuánto cuesta el taxi al centro?'],
+      },
+      básico: {
+        'reserva': ['Tengo una reserva a nombre de García.','¿Puedo hacer una reserva para mañana?','Olvidé hacer la reserva.'],
+        'perdido': ['Creo que estoy perdido, ¿me puede ayudar?','Me perdí buscando la estación.','Se perdió mi equipaje en el aeropuerto.'],
+        'recomendar': ['¿Qué me recomienda visitar?','¿Puede recomendar un buen restaurante?','Le recomiendo tomar el tren.'],
+        'cambiar': ['¿Dónde puedo cambiar dinero?','Necesito cambiar mi vuelo.','¿Puedo cambiar la habitación?'],
+        'equipaje': ['Mi equipaje no llegó.','¿Dónde recojo el equipaje?','Tengo mucho equipaje.'],
+      },
+      intermediário: {
+        'a pesar de': ['A pesar de la lluvia, disfrutamos el paseo.','A pesar de no hablar español, logré comunicarme.','A pesar del retraso, llegamos a tiempo.'],
+        'disponible': ['¿Hay habitaciones disponibles para esta noche?','El tour solo está disponible los fines de semana.','No hay vuelos disponibles hasta mañana.'],
+        'conveniente': ['Es más conveniente viajar en tren que en autobús.','La ubicación del hotel es muy conveniente.','¿Hay un horario más conveniente?'],
+      },
+      avançado: {
+        'itinerario': ['Planifiqué un itinerario detallado para nuestro viaje.','El itinerario incluye visitas a museos y barrios históricos.','Tuvimos que modificar el itinerario por el clima.'],
+        'sumergirse': ['Prefiero sumergirme en la cultura local.','Para sumergirse en el idioma, hay que practicar con nativos.','Se sumergió en la vida del pueblo durante un mes.'],
+      },
+    },
+    Restaurante: {
+      iniciante: {
+        'comida': ['La comida está deliciosa.','Me gusta la comida mexicana.','¿Qué comida tienen?'],
+        'mesa': ['Una mesa para dos, por favor.','¿Esta mesa está libre?','¿Hay una mesa cerca de la ventana?'],
+        'cuenta': ['La cuenta, por favor.','¿Puedo pagar la cuenta?','¿Está incluida la propina en la cuenta?'],
+        'pedir': ['Quisiera pedir el plato del día.','¿Puedo pedir un café?','Ya estamos listos para pedir.'],
+        'rico': ['¡Está muy rico!','La sopa está rica.','Todo estuvo muy rico, gracias.'],
+        'hambre': ['Tengo mucha hambre.','¿Tienes hambre?','No tengo mucha hambre.'],
+        'bebida': ['¿Qué desea de bebida?','Una bebida fría, por favor.','¿Tienen bebidas sin alcohol?'],
+      },
+      básico: {
+        'postre': ['¿Qué postres tienen?','Estoy lleno para el postre.','El postre de chocolate es increíble.'],
+        'picante': ['¿Este plato es picante?','No me gusta la comida picante.','¿Puede hacerlo menos picante?'],
+        'vegetariano': ['¿Tienen opciones vegetarianas?','Soy vegetariano.','¿Este plato es vegetariano?'],
+        'mesero': ['¡Disculpe, mesero!','El mesero fue muy amable.','El mesero recomendó el especial del día.'],
+        'propina': ['¿Cuánto dejo de propina?','La propina está incluida.','Dejamos una buena propina.'],
+      },
+      intermediário: {
+        'maridaje': ['El sommelier sugirió un excelente maridaje.','El maridaje de vinos con el menú fue perfecto.','¿Qué maridaje recomienda para el plato principal?'],
+        'gastronomía': ['La gastronomía peruana es reconocida mundialmente.','Tomamos un tour de gastronomía local.','La gastronomía del lugar superó nuestras expectativas.'],
+      },
+    },
+    Hotel: {
+      iniciante: {
+        'habitación': ['Necesito una habitación para una noche.','Mi habitación está en el tercer piso.','La habitación es muy cómoda.'],
+        'llave': ['Perdí la llave de mi habitación.','¿Me da otra llave?','La llave no funciona.'],
+        'baño': ['¿Dónde está el baño?','El baño necesita toallas.','El baño está limpio.'],
+        'desayuno': ['¿El desayuno está incluido?','¿A qué hora es el desayuno?','¿Dónde se sirve el desayuno?'],
+      },
+      básico: {
+        'recepción': ['Dejé un mensaje en recepción.','La recepción está en la planta baja.','¿Puede llamar a recepción?'],
+        'queja': ['Quisiera hacer una queja por el ruido.','Mi queja fue atendida rápidamente.','No tenemos ninguna queja.'],
+        'servicio': ['El servicio del hotel es excelente.','¿Tienen servicio de lavandería?','El servicio a la habitación es 24 horas.'],
+      },
+    },
+    'Negócios': {
+      iniciante: {
+        'reunión': ['Tengo una reunión a las diez.','La reunión es importante.','¿Dónde es la sala de reunión?'],
+        'trabajo': ['Trabajo en marketing.','Buen trabajo en el proyecto.','¿Dónde trabajas?'],
+        'oficina': ['La oficina está en el quinto piso.','Estoy en la oficina ahora.','Nuestra oficina está en el centro.'],
+        'correo': ['Te envío un correo.','¿Recibiste mi correo?','Revisa tu correo.'],
+      },
+      básico: {
+        'plazo': ['El plazo de entrega es el viernes.','¿Podemos extender el plazo?','Debemos cumplir con el plazo.'],
+        'negociar': ['Necesitamos negociar mejores condiciones.','Voy a negociar el contrato esta tarde.','Están dispuestos a negociar el precio.'],
+        'presentación': ['La presentación salió muy bien.','Tengo una presentación mañana.','¿Puedes preparar una presentación?'],
+        'colega': ['Te presento a mi colega.','Mi colega se encargará del asunto.','Lo discutí con mi colega.'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        'buenos días': ['Buenos días, ¿cómo dormiste?','Buenos días, hace buen día.','Buenos días, ¿quieres café?'],
+        'perdón': ['Perdón, no te escuché.','Perdón, llegué tarde.','Perdón por eso.'],
+        'hoy': ['¿Qué haces hoy?','Hoy es lunes.','Estoy ocupado hoy.'],
+        'gustar': ['Me gusta esta ciudad.','¿Te gusta el café?','Me gustaría ir de compras.'],
+        'querer': ['Quiero aprender español.','¿Quieres comer?','Quiero ir a casa.'],
+        'necesitar': ['Necesito estudiar más.','¿Necesitas algo?','Necesito un descanso.'],
+        'amigo': ['Ella es mi amiga.','Voy a ver a un amigo.','Mi amigo habla español.'],
+        'familia': ['Extraño a mi familia.','Mi familia es de Brasil.','La familia es muy importante.'],
+      },
+      básico: {
+        'en realidad': ['En realidad, prefiero el té.','En realidad, ya estuve allí.','La película en realidad fue mejor de lo esperado.'],
+        'bastante': ['El clima está bastante frío hoy.','Hizo un bastante buen trabajo.','Está bastante lejos de aquí.'],
+        'llevarse bien': ['Me llevo bien con mis vecinos.','Ellos no se llevan muy bien.','Es importante llevarse bien con los compañeros.'],
+      },
+    },
+  },
+  fr: {
+    Viagem: {
+      iniciante: {
+        'bonjour': ['Bonjour, comment allez-vous ?','Bonjour, enchanté.','Bonjour, je m\'appelle Marie.'],
+        'merci': ['Merci beaucoup.','Merci pour votre aide.','Merci, c\'est très gentil.'],
+        's\'il vous plaît': ['S\'il vous plaît, où est la gare ?','Aidez-moi, s\'il vous plaît.','Un café, s\'il vous plaît.'],
+        'au revoir': ['Au revoir, à demain.','Au revoir, bon voyage.','Au revoir, prenez soin de vous.'],
+        'où': ['Où est l\'aéroport ?','Où puis-je trouver un taxi ?','Où se trouve l\'hôtel ?'],
+      },
+      básico: {
+        'réservation': ['J\'ai une réservation au nom de Dupont.','Puis-je faire une réservation ?','J\'ai oublié de faire une réservation.'],
+        'perdu': ['Je crois que je suis perdu.','J\'ai perdu mes bagages.','Mon passeport est perdu.'],
+        'recommander': ['Que recommandez-vous comme restaurant ?','Je vous recommande de visiter le musée.','Pouvez-vous recommander un bon hôtel ?'],
+      },
+    },
+    Restaurante: {
+      iniciante: {
+        'menu': ['Le menu, s\'il vous plaît.','Est-ce qu\'il y a un menu en anglais ?','Le menu a l\'air délicieux.'],
+        'addition': ['L\'addition, s\'il vous plaît.','Puis-je avoir l\'addition ?','Le pourboire est inclus dans l\'addition.'],
+        'délicieux': ['C\'est délicieux !','La soupe est délicieuse.','Tout était délicieux, merci.'],
+        'table': ['Une table pour deux, s\'il vous plaît.','Cette table est-elle libre ?','Pouvons-nous avoir une table près de la fenêtre ?'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        'bonjour': ['Bonjour, tu as bien dormi ?','Bonjour, il fait beau aujourd\'hui.','Bonjour, tu veux un café ?'],
+        'pardon': ['Pardon, je ne vous ai pas entendu.','Pardon, je suis en retard.','Pardon pour le dérangement.'],
+        'aujourd\'hui': ['Qu\'est-ce que tu fais aujourd\'hui ?','Aujourd\'hui, c\'est lundi.','Je suis occupé aujourd\'hui.'],
+        'aimer': ['J\'aime cette ville.','Tu aimes le café ?','J\'aimerais faire du shopping.'],
+      },
+    },
+  },
+  de: {
+    Viagem: {
+      iniciante: {
+        'hallo': ['Hallo, wie geht es Ihnen?','Hallo, freut mich.','Hallo, ich heiße Anna.'],
+        'danke': ['Vielen Dank für Ihre Hilfe.','Danke, das ist sehr nett.','Danke für alles.'],
+        'bitte': ['Bitte, wo ist der Bahnhof?','Helfen Sie mir, bitte.','Einen Kaffee, bitte.'],
+        'wo': ['Wo ist der Flughafen?','Wo kann ich ein Taxi finden?','Wo ist das Hotel?'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        'guten Morgen': ['Guten Morgen, wie hast du geschlafen?','Guten Morgen, schönes Wetter heute.','Guten Morgen, möchtest du einen Kaffee?'],
+        'Entschuldigung': ['Entschuldigung, ich habe Sie nicht gehört.','Entschuldigung, ich bin spät dran.','Entschuldigung dafür.'],
+      },
+    },
+  },
+  it: {
+    Viagem: {
+      iniciante: {
+        'ciao': ['Ciao, come stai?','Ciao, piacere di conoscerti.','Ciao, mi chiamo Marco.'],
+        'grazie': ['Grazie mille.','Grazie per il tuo aiuto.','Grazie, sei molto gentile.'],
+        'per favore': ['Per favore, dov\'è la stazione?','Aiutami, per favore.','Un caffè, per favore.'],
+        'dove': ['Dov\'è l\'aeroporto?','Dove posso trovare un taxi?','Dov\'è l\'hotel?'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        'buongiorno': ['Buongiorno, come hai dormito?','Buongiorno, che bella giornata.','Buongiorno, vuoi un caffè?'],
+        'scusa': ['Scusa, non ti ho sentito.','Scusa, sono in ritardo.','Scusa per quello.'],
+      },
+    },
+  },
+  ja: {
+    Viagem: {
+      iniciante: {
+        'こんにちは': ['こんにちは、お元気ですか？','こんにちは、初めまして。','こんにちは、私の名前はアンナです。'],
+        'ありがとう': ['ありがとうございます。','助けてくれてありがとう。','ありがとう、とても親切ですね。'],
+        'すみません': ['すみません、駅はどこですか？','すみません、助けてください。','すみません、道に迷いました。'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        'おはよう': ['おはようございます、よく眠れましたか？','おはよう、いい天気ですね。','おはよう、コーヒーはいかがですか？'],
+      },
+    },
+  },
+  zh: {
+    Viagem: {
+      iniciante: {
+        '你好': ['你好，你好吗？','你好，很高兴认识你。','你好，我叫安娜。'],
+        '谢谢': ['非常感谢。','谢谢你的帮助。','谢谢，你真好。'],
+        '请': ['请问，火车站在哪里？','请帮帮我。','请给我一杯咖啡。'],
+      },
+    },
+    Cotidiano: {
+      iniciante: {
+        '早上好': ['早上好，你睡得好吗？','早上好，今天天气真好。','早上好，你想喝咖啡吗？'],
+      },
+    },
+  },
+  ar: {
+    Viagem: {
+      iniciante: {
+        'مرحبا': ['مرحبا، كيف حالك؟','مرحبا، تشرفنا.','مرحبا، اسمي أنا.'],
+        'شكرا': ['شكرا جزيلا.','شكرا على مساعدتك.','شكرا، أنت لطيف جدا.'],
+      },
+    },
+  },
+  ru: {
+    Viagem: {
+      iniciante: {
+        'привет': ['Привет, как дела?','Привет, приятно познакомиться.','Привет, меня зовут Анна.'],
+        'спасибо': ['Большое спасибо.','Спасибо за помощь.','Спасибо, вы очень добры.'],
+      },
+    },
+  },
+};
+
+const TEMPLATES_GENERICOS = {
+  en: {
+    Viagem: {
+      iniciante: ['I need {termo} for my trip.','Can you help me find {termo}?','Where can I get {termo}?'],
+      básico: ['I was looking for {termo} when I arrived at the station.','Could you tell me more about {termo} in this city?','We need to arrange {termo} before our departure.'],
+      intermediário: ['Although I had already planned everything, I forgot about {termo}.','Despite the difficulties, we managed to find {termo} nearby.','We eventually figured out where to get {termo}.'],
+      avançado: ['The intricacies of navigating {termo} abroad can be quite challenging for the uninitiated.','One must consider {termo} carefully when planning an extended journey.','Understanding {termo} is fundamental to having a seamless travel experience.'],
+    },
+    Restaurante: {
+      iniciante: ['I would like {termo}, please.','Do you have {termo}?','The {termo} is very good.'],
+      básico: ['Could you recommend something with {termo}?','I am allergic to {termo}, do you have alternatives?','The {termo} here is the best I have ever had.'],
+      intermediário: ['The chef incorporates {termo} in a way that elevates the entire dish.','I was pleasantly surprised by how {termo} complemented the main course.','The menu features {termo} as part of a sophisticated tasting experience.'],
+      avançado: ['The subtle interplay between {termo} and the accompanying flavors creates an extraordinary gustatory experience.','A discerning palate would immediately recognize the quality of {termo} in this preparation.','The culinary tradition surrounding {termo} reflects centuries of gastronomic evolution.'],
+    },
+    Hotel: {
+      iniciante: ['I need {termo} in my room.','Is {termo} available?','Where is {termo}?'],
+      básico: ['Could you arrange {termo} for my room?','I noticed {termo} is not working properly.','The {termo} at this hotel is excellent.'],
+      intermediário: ['The hotel prides itself on providing {termo} as part of their premium service.','We were pleasantly surprised that {termo} was included complimentary.','Managing {termo} expectations is important when choosing accommodations.'],
+      avançado: ['The establishment has set a benchmark for {termo} that few competitors can match.','Discerning travelers have come to expect {termo} as a standard of luxury hospitality.','The meticulous attention to {termo} distinguishes world-class hotels from merely good ones.'],
+    },
+    'Negócios': {
+      iniciante: ['We need {termo} for the project.','Can you send me {termo}?','{termo} is very important.'],
+      básico: ['Let us discuss {termo} in our next meeting.','The {termo} deadline has been moved forward.','I need your input on {termo} before we proceed.'],
+      intermediário: ['Leveraging {termo} effectively could give us a competitive advantage.','The stakeholders have raised concerns about {termo}.','We need a scalable approach to {termo} going forward.'],
+      avançado: ['The strategic implications of {termo} cannot be overstated in the current market landscape.','A thorough due diligence on {termo} revealed both opportunities and risks.','The synergy between {termo} and our core competencies presents a compelling value proposition.'],
+    },
+    Cotidiano: {
+      iniciante: ['I like {termo}.','Do you know about {termo}?','I need {termo} today.'],
+      básico: ['I actually think {termo} is pretty important.','Let me figure out {termo} first.','I want to hang out and talk about {termo}.'],
+      intermediário: ['I have been meaning to get the hang of {termo} for a while now.','We tend to take {termo} for granted until it is gone.','I decided to go with the flow regarding {termo}.'],
+      avançado: ['The nuance of {termo} is often lost on those who have not experienced it firsthand.','An eloquent discussion of {termo} requires both depth of knowledge and cultural sensitivity.','The philosophical implications of {termo} extend far beyond its surface-level interpretation.'],
+    },
+  },
+  es: {
+    Viagem: {
+      iniciante: ['Necesito {termo} para mi viaje.','¿Puede ayudarme a encontrar {termo}?','¿Dónde puedo conseguir {termo}?'],
+      básico: ['Estaba buscando {termo} cuando llegué a la estación.','¿Podría decirme más sobre {termo} en esta ciudad?','Necesitamos organizar {termo} antes de partir.'],
+      intermediário: ['A pesar de haber planeado todo, olvidé {termo}.','A pesar de las dificultades, logramos encontrar {termo}.','Finalmente descubrimos dónde conseguir {termo}.'],
+      avançado: ['Las complejidades de gestionar {termo} en el extranjero pueden ser todo un desafío.','Se debe considerar {termo} cuidadosamente al planificar un viaje extenso.','Comprender {termo} es fundamental para una experiencia de viaje fluida.'],
+    },
+    Restaurante: {
+      iniciante: ['Quisiera {termo}, por favor.','¿Tienen {termo}?','El {termo} está muy bueno.'],
+      básico: ['¿Podría recomendar algo con {termo}?','Soy alérgico a {termo}, ¿tienen alternativas?','El {termo} de aquí es el mejor que he probado.'],
+      intermediário: ['El chef incorpora {termo} de una manera que eleva todo el plato.','Me sorprendió gratamente cómo {termo} complementó el plato principal.','El menú presenta {termo} como parte de una experiencia gastronómica sofisticada.'],
+      avançado: ['La sutil interacción entre {termo} y los sabores acompañantes crea una experiencia gustativa extraordinaria.','Un paladar exigente reconocería inmediatamente la calidad de {termo} en esta preparación.','La tradición culinaria en torno a {termo} refleja siglos de evolución gastronómica.'],
+    },
+    Hotel: {
+      iniciante: ['Necesito {termo} en mi habitación.','¿Está disponible {termo}?','¿Dónde está {termo}?'],
+      básico: ['¿Podría organizar {termo} para mi habitación?','Noté que {termo} no funciona bien.','El {termo} de este hotel es excelente.'],
+      intermediário: ['El hotel se enorgullece de ofrecer {termo} como parte de su servicio premium.','Nos sorprendió que {termo} estuviera incluido de cortesía.','Gestionar las expectativas de {termo} es importante al elegir alojamiento.'],
+      avançado: ['El establecimiento ha establecido un estándar para {termo} que pocos competidores pueden igualar.','Los viajeros exigentes esperan {termo} como estándar de hospitalidad de lujo.','La meticulosa atención a {termo} distingue a los hoteles de clase mundial.'],
+    },
+    'Negócios': {
+      iniciante: ['Necesitamos {termo} para el proyecto.','¿Puedes enviarme {termo}?','{termo} es muy importante.'],
+      básico: ['Discutamos {termo} en nuestra próxima reunión.','El plazo de {termo} se adelantó.','Necesito tu opinión sobre {termo} antes de continuar.'],
+      intermediário: ['Aprovechar {termo} eficazmente podría darnos una ventaja competitiva.','Las partes interesadas han planteado preocupaciones sobre {termo}.','Necesitamos un enfoque escalable para {termo} en el futuro.'],
+      avançado: ['Las implicaciones estratégicas de {termo} no pueden subestimarse en el panorama actual del mercado.','Una debida diligencia exhaustiva sobre {termo} reveló tanto oportunidades como riesgos.','La sinergia entre {termo} y nuestras competencias centrales presenta una propuesta de valor convincente.'],
+    },
+    Cotidiano: {
+      iniciante: ['Me gusta {termo}.','¿Sabes sobre {termo}?','Necesito {termo} hoy.'],
+      básico: ['En realidad creo que {termo} es bastante importante.','Déjame resolver lo de {termo} primero.','Quiero pasar el rato y hablar de {termo}.'],
+      intermediário: ['He querido dominar {termo} desde hace tiempo.','Tendemos a dar por sentado {termo} hasta que ya no lo tenemos.','Decidí dejarlo fluir con respecto a {termo}.'],
+      avançado: ['El matiz de {termo} a menudo se pierde en quienes no lo han experimentado.','Una discusión elocuente sobre {termo} requiere profundidad de conocimiento y sensibilidad cultural.','Las implicaciones filosóficas de {termo} van mucho más allá de su interpretación superficial.'],
+    },
+  },
+  fr: {
+    Viagem: {
+      iniciante: ['J\'ai besoin de {termo} pour mon voyage.','Pouvez-vous m\'aider à trouver {termo} ?','Où puis-je trouver {termo} ?'],
+      básico: ['Je cherchais {termo} quand je suis arrivé à la gare.','Pourriez-vous me dire plus sur {termo} dans cette ville ?','Nous devons organiser {termo} avant notre départ.'],
+      intermediário: ['Bien que j\'aie tout planifié, j\'ai oublié {termo}.','Malgré les difficultés, nous avons réussi à trouver {termo}.','Nous avons finalement découvert où trouver {termo}.'],
+      avançado: ['Les subtilités de {termo} à l\'étranger peuvent être un véritable défi.','Il faut considérer {termo} attentivement lors de la planification d\'un long voyage.','Comprendre {termo} est fondamental pour une expérience de voyage fluide.'],
+    },
+    Restaurante: {
+      iniciante: ['Je voudrais {termo}, s\'il vous plaît.','Avez-vous {termo} ?','Le {termo} est très bon.'],
+      básico: ['Pourriez-vous recommander quelque chose avec {termo} ?','Je suis allergique à {termo}.','Le {termo} ici est le meilleur que j\'ai goûté.'],
+      intermediário: ['Le chef incorpore {termo} d\'une manière qui sublime tout le plat.','J\'ai été agréablement surpris par la façon dont {termo} complétait le plat principal.','Le menu présente {termo} dans une expérience gastronomique sophistiquée.'],
+      avançado: ['L\'interaction subtile entre {termo} et les saveurs environnantes crée une expérience gustative extraordinaire.','Un palais averti reconnaîtrait immédiatement la qualité de {termo}.','La tradition culinaire autour de {termo} reflète des siècles d\'évolution gastronomique.'],
+    },
+    Hotel: {
+      iniciante: ['J\'ai besoin de {termo} dans ma chambre.','Est-ce que {termo} est disponible ?','Où est {termo} ?'],
+      básico: ['Pourriez-vous organiser {termo} pour ma chambre ?','J\'ai remarqué que {termo} ne fonctionne pas.','Le {termo} de cet hôtel est excellent.'],
+      intermediário: ['L\'hôtel est fier d\'offrir {termo} dans son service premium.','Nous avons été surpris que {termo} soit inclus gratuitement.','Gérer les attentes concernant {termo} est important lors du choix d\'un hébergement.'],
+      avançado: ['L\'établissement a fixé un standard pour {termo} que peu de concurrents peuvent égaler.','Les voyageurs exigeants s\'attendent à {termo} comme norme de l\'hospitalité de luxe.','L\'attention méticuleuse portée à {termo} distingue les hôtels de classe mondiale.'],
+    },
+    'Negócios': {
+      iniciante: ['Nous avons besoin de {termo} pour le projet.','Pouvez-vous m\'envoyer {termo} ?','{termo} est très important.'],
+      básico: ['Discutons de {termo} lors de notre prochaine réunion.','La date limite pour {termo} a été avancée.','J\'ai besoin de votre avis sur {termo}.'],
+      intermediário: ['Exploiter {termo} efficacement pourrait nous donner un avantage concurrentiel.','Les parties prenantes ont soulevé des préoccupations concernant {termo}.','Nous avons besoin d\'une approche évolutive pour {termo}.'],
+      avançado: ['Les implications stratégiques de {termo} ne sauraient être sous-estimées.','Une due diligence approfondie sur {termo} a révélé des opportunités et des risques.','La synergie entre {termo} et nos compétences clés présente une proposition de valeur convaincante.'],
+    },
+    Cotidiano: {
+      iniciante: ['J\'aime {termo}.','Tu connais {termo} ?','J\'ai besoin de {termo} aujourd\'hui.'],
+      básico: ['En fait, je pense que {termo} est assez important.','Laisse-moi régler {termo} d\'abord.','Je veux traîner et parler de {termo}.'],
+      intermediário: ['Je voulais maîtriser {termo} depuis longtemps.','On a tendance à prendre {termo} pour acquis.','J\'ai décidé de laisser couler concernant {termo}.'],
+      avançado: ['La nuance de {termo} échappe souvent à ceux qui ne l\'ont pas vécu.','Une discussion éloquente sur {termo} exige profondeur et sensibilité culturelle.','Les implications philosophiques de {termo} vont bien au-delà de son interprétation superficielle.'],
+    },
+  },
+  de: {
+    Viagem: {
+      iniciante: ['Ich brauche {termo} für meine Reise.','Können Sie mir helfen, {termo} zu finden?','Wo kann ich {termo} bekommen?'],
+      básico: ['Ich habe nach {termo} gesucht, als ich am Bahnhof ankam.','Könnten Sie mir mehr über {termo} in dieser Stadt erzählen?','Wir müssen {termo} vor unserer Abreise organisieren.'],
+      intermediário: ['Obwohl ich alles geplant hatte, habe ich {termo} vergessen.','Trotz der Schwierigkeiten haben wir {termo} in der Nähe gefunden.','Wir haben schließlich herausgefunden, wo wir {termo} bekommen können.'],
+      avançado: ['Die Feinheiten von {termo} im Ausland können eine echte Herausforderung sein.','Man muss {termo} sorgfältig berücksichtigen, wenn man eine längere Reise plant.','Das Verständnis von {termo} ist grundlegend für ein reibungsloses Reiseerlebnis.'],
+    },
+    Restaurante: {
+      iniciante: ['Ich hätte gerne {termo}, bitte.','Haben Sie {termo}?','Das {termo} ist sehr gut.'],
+      básico: ['Könnten Sie etwas mit {termo} empfehlen?','Ich bin allergisch gegen {termo}.','Das {termo} hier ist das beste, das ich je hatte.'],
+      intermediário: ['Der Koch verwendet {termo} auf eine Weise, die das ganze Gericht aufwertet.','Ich war angenehm überrascht, wie {termo} den Hauptgang ergänzte.','Die Speisekarte präsentiert {termo} als Teil eines anspruchsvollen Erlebnisses.'],
+      avançado: ['Das subtile Zusammenspiel von {termo} und den begleitenden Aromen schafft ein außergewöhnliches Geschmackserlebnis.','Ein geschulter Gaumen würde die Qualität von {termo} sofort erkennen.','Die kulinarische Tradition rund um {termo} spiegelt Jahrhunderte gastronomischer Entwicklung wider.'],
+    },
+    Hotel: {
+      iniciante: ['Ich brauche {termo} in meinem Zimmer.','Ist {termo} verfügbar?','Wo ist {termo}?'],
+      básico: ['Könnten Sie {termo} für mein Zimmer organisieren?','Ich habe bemerkt, dass {termo} nicht richtig funktioniert.','Das {termo} in diesem Hotel ist ausgezeichnet.'],
+      intermediário: ['Das Hotel ist stolz darauf, {termo} als Teil seines Premium-Services anzubieten.','Wir waren überrascht, dass {termo} kostenlos enthalten war.','Die Erwartungen an {termo} zu managen ist wichtig bei der Wahl der Unterkunft.'],
+      avançado: ['Das Haus hat einen Maßstab für {termo} gesetzt, den wenige Wettbewerber erreichen können.','Anspruchsvolle Reisende erwarten {termo} als Standard luxuriöser Gastfreundschaft.','Die akribische Aufmerksamkeit für {termo} unterscheidet Weltklasse-Hotels von guten.'],
+    },
+    'Negócios': {
+      iniciante: ['Wir brauchen {termo} für das Projekt.','Können Sie mir {termo} schicken?','{termo} ist sehr wichtig.'],
+      básico: ['Lassen Sie uns {termo} in unserem nächsten Meeting besprechen.','Die Frist für {termo} wurde vorverlegt.','Ich brauche Ihre Meinung zu {termo}.'],
+      intermediário: ['{termo} effektiv zu nutzen könnte uns einen Wettbewerbsvorteil verschaffen.','Die Stakeholder haben Bedenken zu {termo} geäußert.','Wir brauchen einen skalierbaren Ansatz für {termo}.'],
+      avançado: ['Die strategischen Implikationen von {termo} können in der aktuellen Marktlandschaft nicht überschätzt werden.','Eine gründliche Due Diligence zu {termo} offenbarte sowohl Chancen als auch Risiken.','Die Synergie zwischen {termo} und unseren Kernkompetenzen bietet ein überzeugendes Wertversprechen.'],
+    },
+    Cotidiano: {
+      iniciante: ['Ich mag {termo}.','Weißt du über {termo} Bescheid?','Ich brauche {termo} heute.'],
+      básico: ['Eigentlich finde ich {termo} ziemlich wichtig.','Lass mich zuerst {termo} klären.','Ich möchte abhängen und über {termo} reden.'],
+      intermediário: ['Ich wollte {termo} schon seit einer Weile meistern.','Wir neigen dazu, {termo} als selbstverständlich zu nehmen.','Ich habe beschlossen, es bei {termo} laufen zu lassen.'],
+      avançado: ['Die Nuance von {termo} entgeht oft denen, die es nicht selbst erlebt haben.','Eine eloquente Diskussion über {termo} erfordert Tiefe und kulturelle Sensibilität.','Die philosophischen Implikationen von {termo} gehen weit über die oberflächliche Interpretation hinaus.'],
+    },
+  },
+  it: {
+    Viagem: {
+      iniciante: ['Ho bisogno di {termo} per il mio viaggio.','Puoi aiutarmi a trovare {termo}?','Dove posso trovare {termo}?'],
+      básico: ['Stavo cercando {termo} quando sono arrivato alla stazione.','Potrebbe dirmi di più su {termo} in questa città?','Dobbiamo organizzare {termo} prima della partenza.'],
+      intermediário: ['Nonostante avessi pianificato tutto, ho dimenticato {termo}.','Nonostante le difficoltà, siamo riusciti a trovare {termo}.','Alla fine abbiamo scoperto dove trovare {termo}.'],
+      avançado: ['Le complessità di {termo} all\'estero possono essere una vera sfida.','Bisogna considerare {termo} attentamente quando si pianifica un viaggio lungo.','Comprendere {termo} è fondamentale per un\'esperienza di viaggio fluida.'],
+    },
+    Restaurante: {
+      iniciante: ['Vorrei {termo}, per favore.','Avete {termo}?','Il {termo} è molto buono.'],
+      básico: ['Potrebbe consigliare qualcosa con {termo}?','Sono allergico a {termo}.','Il {termo} qui è il migliore che abbia mai provato.'],
+      intermediário: ['Lo chef incorpora {termo} in modo da elevare l\'intero piatto.','Sono rimasto piacevolmente sorpreso da come {termo} complementava il piatto principale.','Il menu presenta {termo} come parte di un\'esperienza gastronomica sofisticata.'],
+      avançado: ['La sottile interazione tra {termo} e i sapori circostanti crea un\'esperienza gustativa straordinaria.','Un palato raffinato riconoscerebbe immediatamente la qualità di {termo}.','La tradizione culinaria intorno a {termo} riflette secoli di evoluzione gastronomica.'],
+    },
+    Hotel: {
+      iniciante: ['Ho bisogno di {termo} nella mia stanza.','È disponibile {termo}?','Dov\'è {termo}?'],
+      básico: ['Potrebbe organizzare {termo} per la mia stanza?','Ho notato che {termo} non funziona.','Il {termo} di questo hotel è eccellente.'],
+      intermediário: ['L\'hotel è orgoglioso di offrire {termo} come parte del servizio premium.','Siamo rimasti sorpresi che {termo} fosse incluso gratuitamente.','Gestire le aspettative su {termo} è importante nella scelta dell\'alloggio.'],
+      avançado: ['La struttura ha stabilito uno standard per {termo} che pochi concorrenti possono eguagliare.','I viaggiatori esigenti si aspettano {termo} come standard dell\'ospitalità di lusso.','La meticolosa attenzione a {termo} distingue gli hotel di classe mondiale.'],
+    },
+    'Negócios': {
+      iniciante: ['Abbiamo bisogno di {termo} per il progetto.','Puoi inviarmi {termo}?','{termo} è molto importante.'],
+      básico: ['Discutiamo di {termo} nel nostro prossimo incontro.','La scadenza per {termo} è stata anticipata.','Ho bisogno del tuo parere su {termo}.'],
+      intermediário: ['Sfruttare {termo} efficacemente potrebbe darci un vantaggio competitivo.','Le parti interessate hanno sollevato preoccupazioni su {termo}.','Abbiamo bisogno di un approccio scalabile per {termo}.'],
+      avançado: ['Le implicazioni strategiche di {termo} non possono essere sottovalutate nel panorama attuale.','Una due diligence approfondita su {termo} ha rivelato opportunità e rischi.','La sinergia tra {termo} e le nostre competenze chiave offre una proposta di valore convincente.'],
+    },
+    Cotidiano: {
+      iniciante: ['Mi piace {termo}.','Conosci {termo}?','Ho bisogno di {termo} oggi.'],
+      básico: ['In realtà penso che {termo} sia abbastanza importante.','Lasciami risolvere {termo} prima.','Voglio uscire e parlare di {termo}.'],
+      intermediário: ['Volevo padroneggiare {termo} da un po\' di tempo.','Tendiamo a dare per scontato {termo}.','Ho deciso di lasciar correre riguardo a {termo}.'],
+      avançado: ['La sfumatura di {termo} sfugge spesso a chi non l\'ha vissuta.','Una discussione eloquente su {termo} richiede profondità e sensibilità culturale.','Le implicazioni filosofiche di {termo} vanno ben oltre la sua interpretazione superficiale.'],
+    },
+  },
+  ja: {
+    Viagem: {
+      iniciante: ['旅行に{termo}が必要です。','{termo}を見つけるのを手伝ってもらえますか？','{termo}はどこにありますか？'],
+      básico: ['駅に着いた時、{termo}を探していました。','この街の{termo}についてもっと教えてもらえますか？','出発前に{termo}を手配する必要があります。'],
+      intermediário: ['すべて計画したにもかかわらず、{termo}を忘れてしまいました。','困難にもかかわらず、近くで{termo}を見つけることができました。','最終的に{termo}をどこで手に入れるか分かりました。'],
+      avançado: ['海外で{termo}の複雑さに対処することは、経験の浅い人にとって大きな挑戦となり得ます。','長期旅行を計画する際には、{termo}を慎重に考慮する必要があります。','{termo}を理解することは、シームレスな旅行体験の基本です。'],
+    },
+    Restaurante: {
+      iniciante: ['{termo}をお願いします。','{termo}はありますか？','{termo}はとても美味しいです。'],
+      básico: ['{termo}を使った料理をお勧めしてもらえますか？','{termo}にアレルギーがあります。','ここの{termo}は今まで食べた中で一番です。'],
+      intermediário: ['シェフは{termo}を料理全体を引き立てる方法で使っています。','{termo}がメインコースを補完する方法に嬉しい驚きでした。','メニューは洗練された味覚体験の一部として{termo}を提供しています。'],
+      avançado: ['{termo}と周囲のフレーバーとの微妙な相互作用が、並外れた味覚体験を生み出します。','訓練された味覚は、この調理における{termo}の品質をすぐに認識するでしょう。','{termo}を取り巻く料理の伝統は、数世紀にわたる美食の進化を反映しています。'],
+    },
+    Hotel: {
+      iniciante: ['部屋に{termo}が必要です。','{termo}は利用可能ですか？','{termo}はどこですか？'],
+      básico: ['部屋に{termo}を手配してもらえますか？','{termo}が正常に動作していないことに気づきました。','このホテルの{termo}は素晴らしいです。'],
+      intermediário: ['ホテルはプレミアムサービスの一環として{termo}を提供することに誇りを持っています。','{termo}が無料で含まれていることに驚きました。','宿泊施設を選ぶ際に{termo}の期待を管理することは重要です。'],
+      avançado: ['この施設は{termo}において、競合他社がなかなか達成できない基準を設定しました。','目の肥えた旅行者は、ラグジュアリーホスピタリティの基準として{termo}を期待しています。','{termo}への細心の注意が、ワールドクラスのホテルを単に良いホテルから区別します。'],
+    },
+    'Negócios': {
+      iniciante: ['プロジェクトに{termo}が必要です。','{termo}を送ってもらえますか？','{termo}はとても重要です。'],
+      básico: ['次のミーティングで{termo}について話し合いましょう。','{termo}の締め切りが前倒しになりました。','進める前に{termo}についてのご意見が必要です。'],
+      intermediário: ['{termo}を効果的に活用することで、競争上の優位性を得られるかもしれません。','ステークホルダーが{termo}について懸念を示しています。','今後{termo}に対するスケーラブルなアプローチが必要です。'],
+      avançado: ['現在の市場環境において{termo}の戦略的意味合いを過小評価することはできません。','{termo}に関する徹底的なデューデリジェンスにより、機会とリスクの両方が明らかになりました。','{termo}と当社のコア・コンピタンスとのシナジーは、説得力のある価値提案を提示しています。'],
+    },
+    Cotidiano: {
+      iniciante: ['{termo}が好きです。','{termo}について知っていますか？','今日{termo}が必要です。'],
+      básico: ['実は{termo}はかなり重要だと思います。','まず{termo}を解決させてください。','{termo}について話しながら過ごしたいです。'],
+      intermediário: ['しばらく前から{termo}をマスターしたいと思っていました。','私たちは{termo}を当たり前のものとして捉えがちです。','{termo}に関しては流れに任せることにしました。'],
+      avançado: ['{termo}のニュアンスは、それを直接経験したことがない人には見えないことが多いです。','{termo}についての雄弁な議論には、知識の深さと文化的感性の両方が必要です。','{termo}の哲学的な意味合いは、表面的な解釈をはるかに超えています。'],
+    },
+  },
+  zh: {
+    Viagem: {
+      iniciante: ['我旅行需要{termo}。','你能帮我找到{termo}吗？','哪里可以找到{termo}？'],
+      básico: ['我到车站时正在找{termo}。','你能告诉我更多关于这个城市的{termo}吗？','我们需要在出发前安排{termo}。'],
+      intermediário: ['虽然我已经计划好了一切，但我忘了{termo}。','尽管困难重重，我们还是在附近找到了{termo}。','我们最终弄清楚了在哪里可以找到{termo}。'],
+      avançado: ['在国外处理{termo}的复杂性对于没有经验的人来说可能是一个相当大的挑战。','在计划长途旅行时，必须仔细考虑{termo}。','理解{termo}是获得无缝旅行体验的基础。'],
+    },
+    Restaurante: {
+      iniciante: ['我想要{termo}，请。','你们有{termo}吗？','{termo}很好吃。'],
+      básico: ['你能推荐一道有{termo}的菜吗？','我对{termo}过敏。','这里的{termo}是我吃过的最好的。'],
+      intermediário: ['厨师以一种提升整道菜品的方式融入了{termo}。','{termo}与主菜的搭配让我感到惊喜。','菜单将{termo}作为精致品鉴体验的一部分。'],
+      avançado: ['{termo}与周围风味之间微妙的相互作用创造了非凡的味觉体验。','训练有素的味觉会立即识别出这道菜中{termo}的品质。','围绕{termo}的烹饪传统反映了数百年的美食演变。'],
+    },
+    Hotel: {
+      iniciante: ['我房间需要{termo}。','{termo}有吗？','{termo}在哪里？'],
+      básico: ['你能为我的房间安排{termo}吗？','我注意到{termo}不正常工作。','这家酒店的{termo}非常好。'],
+      intermediário: ['酒店以提供{termo}作为其优质服务的一部分而自豪。','我们惊喜地发现{termo}是免费包含的。','在选择住宿时管理对{termo}的期望很重要。'],
+      avançado: ['该机构为{termo}设定了一个少有竞争者能匹配的标准。','挑剔的旅客已经将{termo}视为豪华酒店的标准。','对{termo}的精心关注将世界级酒店与普通好酒店区分开来。'],
+    },
+    'Negócios': {
+      iniciante: ['项目需要{termo}。','你能把{termo}发给我吗？','{termo}非常重要。'],
+      básico: ['让我们在下次会议上讨论{termo}。','{termo}的截止日期提前了。','在继续之前，我需要你对{termo}的意见。'],
+      intermediário: ['有效利用{termo}可以给我们带来竞争优势。','利益相关者对{termo}提出了担忧。','我们需要一种可扩展的方法来应对{termo}。'],
+      avançado: ['在当前市场格局中，{termo}的战略影响不容低估。','对{termo}的彻底尽职调查揭示了机遇和风险。','{termo}与我们核心能力之间的协同效应提供了令人信服的价值主张。'],
+    },
+    Cotidiano: {
+      iniciante: ['我喜欢{termo}。','你知道{termo}吗？','我今天需要{termo}。'],
+      básico: ['其实我觉得{termo}挺重要的。','让我先搞清楚{termo}。','我想出去聊聊{termo}。'],
+      intermediário: ['我一直想掌握{termo}。','我们往往把{termo}视为理所当然。','关于{termo}，我决定顺其自然。'],
+      avançado: ['{termo}的细微差别往往被那些没有亲身经历过的人所忽视。','对{termo}的雄辩讨论需要知识深度和文化敏感性。','{termo}的哲学含义远远超出了其表面解释。'],
+    },
+  },
+  ar: {
+    Viagem: {
+      iniciante: ['أحتاج {termo} لرحلتي.','هل يمكنك مساعدتي في إيجاد {termo}؟','أين يمكنني الحصول على {termo}؟'],
+      básico: ['كنت أبحث عن {termo} عندما وصلت إلى المحطة.','هل يمكنك إخباري المزيد عن {termo} في هذه المدينة؟','نحتاج إلى ترتيب {termo} قبل مغادرتنا.'],
+      intermediário: ['على الرغم من أنني خططت لكل شيء، نسيت {termo}.','رغم الصعوبات، تمكنا من إيجاد {termo} بالقرب.','في النهاية اكتشفنا أين نحصل على {termo}.'],
+      avançado: ['تعقيدات التعامل مع {termo} في الخارج قد تكون تحدياً كبيراً.','يجب مراعاة {termo} بعناية عند التخطيط لرحلة طويلة.','فهم {termo} أساسي لتجربة سفر سلسة.'],
+    },
+    Restaurante: {
+      iniciante: ['أريد {termo} من فضلك.','هل عندكم {termo}؟','{termo} لذيذ جداً.'],
+      básico: ['هل يمكنك أن توصي بشيء مع {termo}؟','أنا أعاني من حساسية تجاه {termo}.','ال{termo} هنا هو الأفضل الذي تذوقته.'],
+      intermediário: ['يدمج الشيف {termo} بطريقة ترتقي بالطبق بأكمله.','فوجئت بسرور بكيفية تكامل {termo} مع الطبق الرئيسي.','تقدم القائمة {termo} كجزء من تجربة تذوق راقية.'],
+      avançado: ['التفاعل الدقيق بين {termo} والنكهات المصاحبة يخلق تجربة ذوقية استثنائية.','الذوق المدرب سيتعرف فوراً على جودة {termo} في هذا التحضير.','التقاليد الطهوية المحيطة بـ {termo} تعكس قروناً من التطور الغذائي.'],
+    },
+    Hotel: {
+      iniciante: ['أحتاج {termo} في غرفتي.','هل {termo} متاح؟','أين {termo}؟'],
+      básico: ['هل يمكنك ترتيب {termo} لغرفتي؟','لاحظت أن {termo} لا يعمل بشكل صحيح.','ال{termo} في هذا الفندق ممتاز.'],
+      intermediário: ['يفخر الفندق بتقديم {termo} كجزء من خدمته المتميزة.','فوجئنا بأن {termo} كان مشمولاً مجاناً.','إدارة التوقعات بشأن {termo} مهمة عند اختيار الإقامة.'],
+      avançado: ['وضعت المؤسسة معياراً لـ {termo} يصعب على المنافسين مجاراته.','يتوقع المسافرون المميزون {termo} كمعيار للضيافة الفاخرة.','الاهتمام الدقيق بـ {termo} يميز الفنادق العالمية عن الجيدة فحسب.'],
+    },
+    'Negócios': {
+      iniciante: ['نحتاج {termo} للمشروع.','هل يمكنك إرسال {termo} لي؟','{termo} مهم جداً.'],
+      básico: ['دعنا نناقش {termo} في اجتماعنا القادم.','تم تقديم الموعد النهائي لـ {termo}.','أحتاج رأيك في {termo} قبل المتابعة.'],
+      intermediário: ['الاستفادة من {termo} بفعالية يمكن أن يمنحنا ميزة تنافسية.','أثار أصحاب المصلحة مخاوف بشأن {termo}.','نحتاج نهجاً قابلاً للتوسع لـ {termo} في المستقبل.'],
+      avançado: ['لا يمكن التقليل من الآثار الاستراتيجية لـ {termo} في المشهد السوقي الحالي.','كشفت العناية الواجبة الشاملة حول {termo} عن فرص ومخاطر.','التآزر بين {termo} وكفاءاتنا الأساسية يقدم عرض قيمة مقنعاً.'],
+    },
+    Cotidiano: {
+      iniciante: ['أحب {termo}.','هل تعرف {termo}؟','أحتاج {termo} اليوم.'],
+      básico: ['في الحقيقة أعتقد أن {termo} مهم جداً.','دعني أحل مسألة {termo} أولاً.','أريد أن أتسكع وأتحدث عن {termo}.'],
+      intermediário: ['كنت أريد إتقان {termo} منذ فترة.','نحن نميل لأخذ {termo} كأمر مسلم به.','قررت أن أترك الأمور تسير بخصوص {termo}.'],
+      avançado: ['الفروق الدقيقة في {termo} غالباً ما تضيع على من لم يختبرها بنفسه.','النقاش البليغ حول {termo} يتطلب عمقاً في المعرفة وحساسية ثقافية.','الآثار الفلسفية لـ {termo} تتجاوز بكثير تفسيرها السطحي.'],
+    },
+  },
+  ru: {
+    Viagem: {
+      iniciante: ['Мне нужен {termo} для поездки.','Вы можете помочь мне найти {termo}?','Где я могу найти {termo}?'],
+      básico: ['Я искал {termo}, когда прибыл на вокзал.','Не могли бы вы рассказать больше о {termo} в этом городе?','Нам нужно организовать {termo} до отъезда.'],
+      intermediário: ['Хотя я всё спланировал, я забыл о {termo}.','Несмотря на трудности, мы нашли {termo} поблизости.','В конце концов мы выяснили, где найти {termo}.'],
+      avançado: ['Тонкости {termo} за рубежом могут стать серьёзным вызовом.','При планировании длительного путешествия необходимо тщательно учитывать {termo}.','Понимание {termo} является основой для комфортного путешествия.'],
+    },
+    Restaurante: {
+      iniciante: ['Я хотел бы {termo}, пожалуйста.','У вас есть {termo}?','{termo} очень вкусный.'],
+      básico: ['Можете порекомендовать что-нибудь с {termo}?','У меня аллергия на {termo}.','Здешний {termo} — лучший, что я пробовал.'],
+      intermediário: ['Шеф-повар использует {termo} так, что это возвышает всё блюдо.','Я был приятно удивлён тем, как {termo} дополнил основное блюдо.','Меню представляет {termo} как часть изысканного гастрономического опыта.'],
+      avançado: ['Тонкое взаимодействие {termo} с сопутствующими вкусами создаёт необыкновенное гастрономическое впечатление.','Тренированный вкус сразу распознает качество {termo} в этом приготовлении.','Кулинарная традиция вокруг {termo} отражает века гастрономической эволюции.'],
+    },
+    Hotel: {
+      iniciante: ['Мне нужен {termo} в номере.','Доступен ли {termo}?','Где находится {termo}?'],
+      básico: ['Не могли бы вы организовать {termo} для моего номера?','Я заметил, что {termo} не работает.','В этом отеле {termo} превосходен.'],
+      intermediário: ['Отель гордится тем, что предоставляет {termo} как часть премиум-сервиса.','Мы были приятно удивлены, что {termo} включён бесплатно.','Управление ожиданиями относительно {termo} важно при выборе жилья.'],
+      avançado: ['Это заведение установило стандарт для {termo}, которому мало кто из конкурентов может соответствовать.','Взыскательные путешественники ожидают {termo} как стандарт роскошного гостеприимства.','Скрупулёзное внимание к {termo} отличает отели мирового класса.'],
+    },
+    'Negócios': {
+      iniciante: ['Нам нужен {termo} для проекта.','Можете прислать мне {termo}?','{termo} очень важен.'],
+      básico: ['Давайте обсудим {termo} на следующей встрече.','Срок по {termo} был перенесён.','Мне нужно ваше мнение о {termo}.'],
+      intermediário: ['Эффективное использование {termo} может дать нам конкурентное преимущество.','Заинтересованные стороны высказали озабоченность по поводу {termo}.','Нам нужен масштабируемый подход к {termo}.'],
+      avançado: ['Стратегические последствия {termo} нельзя недооценивать в текущей рыночной ситуации.','Тщательная проверка {termo} выявила как возможности, так и риски.','Синергия между {termo} и нашими ключевыми компетенциями представляет убедительное ценностное предложение.'],
+    },
+    Cotidiano: {
+      iniciante: ['Мне нравится {termo}.','Ты знаешь о {termo}?','Мне нужен {termo} сегодня.'],
+      básico: ['На самом деле я думаю, что {termo} довольно важен.','Дай мне сначала разобраться с {termo}.','Хочу погулять и поговорить о {termo}.'],
+      intermediário: ['Я давно хотел освоить {termo}.','Мы склонны принимать {termo} как должное.','Я решил не заморачиваться по поводу {termo}.'],
+      avançado: ['Нюансы {termo} часто ускользают от тех, кто не испытал это на себе.','Красноречивое обсуждение {termo} требует глубины знаний и культурной чуткости.','Философские импликации {termo} выходят далеко за рамки поверхностной интерпретации.'],
+    },
+  },
+};
+
+function getLangCode(idiomaId) {
+  const lang = IDIOMAS_DISPONIVEIS.find(l => l.id === idiomaId);
+  return lang ? lang.codigo : 'en';
+}
+
+function buscarFrasesParaTermo(termo, langCode, tema, nivel) {
+  const termoLower = termo.toLowerCase().trim();
+  const db = FRASES_DB[langCode];
+  if (!db) return [];
+
+  const frases = [];
+  const temas = tema && tema !== 'Geral' ? [tema] : ['Viagem','Restaurante','Hotel','Negócios','Cotidiano'];
+  const niveis = [nivel, 'iniciante', 'básico', 'intermediário', 'avançado'].filter(Boolean);
+
+  for (const t of temas) {
+    if (!db[t]) continue;
+    for (const n of niveis) {
+      if (!db[t][n]) continue;
+      const termDB = db[t][n][termoLower];
+      if (termDB) {
+        frases.push(...termDB.map(f => ({ frase: f, tema: t, nivel: n, tipo: 'curada' })));
+      }
+    }
+    if (frases.length >= 3) break;
+  }
+
+  if (frases.length < 3) {
+    for (const t of temas) {
+      if (!db[t]) continue;
+      for (const n of niveis) {
+        if (!db[t][n]) continue;
+        for (const [key, vals] of Object.entries(db[t][n])) {
+          if (key === termoLower) continue;
+          for (const f of vals) {
+            if (f.toLowerCase().includes(termoLower)) {
+              frases.push({ frase: f, tema: t, nivel: n, tipo: 'curada' });
+            }
+          }
+        }
+        if (frases.length >= 3) break;
+      }
+      if (frases.length >= 3) break;
+    }
+  }
+
+  return frases;
+}
+
+function gerarFrasesTemplate(termo, langCode, tema, nivel) {
+  const templates = TEMPLATES_GENERICOS[langCode];
+  if (!templates) return [];
+
+  const temas = tema && tema !== 'Geral' ? [tema] : ['Cotidiano'];
+  const nivelUsar = nivel || 'iniciante';
+  const frases = [];
+
+  for (const t of temas) {
+    if (!templates[t] || !templates[t][nivelUsar]) continue;
+    for (const tmpl of templates[t][nivelUsar]) {
+      frases.push({ frase: tmpl.replace(/\{termo\}/g, termo), tema: t, nivel: nivelUsar, tipo: 'template' });
+    }
+  }
+
+  if (frases.length < 3 && templates['Cotidiano'] && templates['Cotidiano'][nivelUsar]) {
+    for (const tmpl of templates['Cotidiano'][nivelUsar]) {
+      const f = tmpl.replace(/\{termo\}/g, termo);
+      if (!frases.find(x => x.frase === f)) {
+        frases.push({ frase: f, tema: 'Cotidiano', nivel: nivelUsar, tipo: 'template' });
+      }
+    }
+  }
+
+  return frases;
+}
+
+function obterFrasesParaTermo(termo, langCode, tema, nivel) {
+  let frases = buscarFrasesParaTermo(termo, langCode, tema, nivel);
+  if (frases.length < 3) {
+    const templates = gerarFrasesTemplate(termo, langCode, tema, nivel);
+    for (const t of templates) {
+      if (!frases.find(f => f.frase === t.frase)) frases.push(t);
+    }
+  }
+  return frases.slice(0, 6);
+}
+
+// ── PRÁTICA ──
 function selectChip(el, idiomaId, type) {
   const group = document.getElementById('chips-' + type + '-' + idiomaId);
   group.querySelectorAll('.config-chip').forEach(c => c.classList.remove('selected'));
@@ -836,30 +1587,33 @@ function shuffle(arr) {
   return a;
 }
 
-function gerarExerciciosLocais(termos) {
+function gerarExerciciosLocais(termos, langCode, tema, nivel) {
   const exercicios = [];
   const shuffled = shuffle(termos);
 
   shuffled.forEach(t => {
-    if (!t.termo || !t.significado) return;
+    if (!t.termo) return;
 
-    exercicios.push({
-      tipo: 'flashcard',
-      enunciado: `Qual o significado de "${t.termo}"?`,
-      resposta: t.significado
-    });
+    const frases = obterFrasesParaTermo(t.termo, langCode, tema, nivel);
 
-    if (t.frase_exemplo_1) {
-      const frase = t.frase_exemplo_1;
-      const re = new RegExp(t.termo, 'gi');
-      if (re.test(frase)) {
+    if (t.significado) {
+      exercicios.push({
+        tipo: 'flashcard',
+        enunciado: `Qual o significado de "${t.termo}"?`,
+        resposta: t.significado
+      });
+    }
+
+    frases.forEach(f => {
+      const re = new RegExp(t.termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+      if (re.test(f.frase)) {
         exercicios.push({
           tipo: 'complete a frase',
-          enunciado: frase.replace(re, '_____'),
+          enunciado: f.frase.replace(re, '_____'),
           resposta: t.termo
         });
       }
-    }
+    });
 
     if (t.sinonimos && t.sinonimos.length) {
       exercicios.push({
@@ -869,14 +1623,25 @@ function gerarExerciciosLocais(termos) {
       });
     }
 
+    const fraseRef = frases.length ? frases[0].frase : (t.frase_exemplo_1 || t.frase_exemplo_2 || '(resposta livre)');
     exercicios.push({
       tipo: 'crie uma frase',
       enunciado: `Escreva uma frase usando "${t.termo}"`,
-      resposta: t.frase_exemplo_1 || t.frase_exemplo_2 || '(resposta livre)'
+      resposta: fraseRef
     });
+
+    if (frases.length) {
+      const fraseDestaque = frases[Math.floor(Math.random() * frases.length)];
+      const re2 = new RegExp(`(${t.termo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+      exercicios.push({
+        tipo: 'leitura',
+        enunciado: fraseDestaque.frase.replace(re2, '<strong style="color:var(--accent)">$1</strong>'),
+        resposta: t.significado || t.termo
+      });
+    }
   });
 
-  return shuffle(exercicios).slice(0, 6);
+  return shuffle(exercicios).slice(0, 8);
 }
 
 async function gerarPratica(idiomaId) {
@@ -888,14 +1653,16 @@ async function gerarPratica(idiomaId) {
 
   const temaEl = document.querySelector(`#chips-tema-${idiomaId} .config-chip.selected`);
   const tema = temaEl ? temaEl.textContent : 'Geral';
+  const langCode = getLangCode(idiomaId);
+  const nivel = ui.nivel || 'iniciante';
 
   const filtrados = temaEl
     ? currentLangTermos.filter(t => t.tema && t.tema.toLowerCase() === tema.toLowerCase())
     : currentLangTermos;
   const termosParaUsar = filtrados.length >= 2 ? filtrados : currentLangTermos;
 
-  const exercicios = gerarExerciciosLocais(termosParaUsar);
-  if (!exercicios.length) return showToast('Adicione termos com significado para praticar!', 'error');
+  const exercicios = gerarExerciciosLocais(termosParaUsar, langCode, tema, nivel);
+  if (!exercicios.length) return showToast('Adicione termos para praticar!', 'error');
 
   const resultado = document.getElementById('pratica-resultado-' + idiomaId);
   resultado.innerHTML = `
@@ -904,7 +1671,7 @@ async function gerarPratica(idiomaId) {
         <div class="exercicio-card">
           <div class="ex-tipo">${ex.tipo}</div>
           <div class="ex-enunciado">${ex.enunciado}</div>
-          <input class="ex-input" id="ex-input-${idiomaId}-${i}" placeholder="Sua resposta...">
+          ${ex.tipo === 'leitura' ? '' : `<input class="ex-input" id="ex-input-${idiomaId}-${i}" placeholder="Sua resposta...">`}
           <div class="ex-feedback" id="ex-fb-${idiomaId}-${i}"></div>
           <div style="display:none" id="ex-resp-${idiomaId}-${i}">${ex.resposta}</div>
         </div>
